@@ -12,6 +12,8 @@ import { launchWorkerForCard } from './host/launchWorker';
 import { newPrd } from './host/newPrdCommand';
 import { selectControlRepo } from './host/selectControlRepo';
 import { autoStatus, autoDecompose } from './host/autoCommand';
+import { syncReview } from './host/syncReview';
+import { execCommandRunner } from './proc/commandRunner';
 import { MenuTreeProvider } from './host/menuTree';
 import { Config, DEFAULT_CONFIG, parseConfig } from './core/config/config';
 import { nodeEngineProbe } from './proc/engineProbe';
@@ -66,6 +68,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('automatos.autoDecompose', () =>
       withHost((host) => decomposeFlow(host)),
+    ),
+    vscode.commands.registerCommand('automatos.syncReview', () =>
+      withHost((host) => syncReviewFlow(host)),
     ),
     vscode.commands.registerCommand('automatos.launchWorker', (arg: unknown) =>
       withHost((host) => launchFlow(host, arg)),
@@ -176,6 +181,19 @@ async function decomposeFlow(host: Host): Promise<void> {
   if (card) {
     await autoDecompose(host.store, host.git, card);
   }
+}
+
+/** Advance review cards whose PR has merged to done, closing the board loop. */
+async function syncReviewFlow(host: Host): Promise<void> {
+  const config = await loadConfig(host.store);
+  await syncReview({
+    root: host.root,
+    store: host.store,
+    git: host.git,
+    config,
+    run: execCommandRunner,
+    now: () => new Date().toISOString(),
+  });
 }
 
 async function loadConfig(store: FileStore): Promise<Config> {

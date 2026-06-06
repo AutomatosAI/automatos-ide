@@ -30,6 +30,7 @@ const ACTIONS: readonly { label: string; commandId: string; icon: string }[] = [
   { label: 'Team Chat', commandId: 'automatos.openChat', icon: 'comment-discussion' },
   { label: 'AUTO Status', commandId: 'automatos.autoStatus', icon: 'pulse' },
   { label: 'Split a PRD into tasks', commandId: 'automatos.autoDecompose', icon: 'list-tree' },
+  { label: 'Sync Review (merged → Done)', commandId: 'automatos.syncReview', icon: 'git-merge' },
   { label: 'Consolidate Memory', commandId: 'automatos.consolidateMemory', icon: 'archive' },
   { label: 'Settings', commandId: 'automatos.openSettings', icon: 'settings-gear' },
   { label: 'Set Control Repo', commandId: 'automatos.selectControlRepo', icon: 'root-folder' },

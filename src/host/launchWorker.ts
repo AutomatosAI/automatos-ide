@@ -1,7 +1,6 @@
 import * as vscode from 'vscode';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { homedir } from 'node:os';
 import { FileStore } from '../fs/fileStore';
 import { GitOps } from '../git/gitOps';
 import { execGitRunner } from '../git/runner';
@@ -11,10 +10,9 @@ import { EngineProbe, preflightEngine } from '../core/engines/preflight';
 import { buildInteractiveLaunchCommand } from '../core/engines/engineAdapter';
 import { engineForCard, branchForCard } from '../core/supervisor/supervisorPlan';
 import { buildWorkerPrompt } from '../core/worker/workerPrompt';
-import { projectRepoPathFor } from '../core/worker/projectRepo';
 import { toShellCommandLine } from '../core/worker/launchShell';
 import { claimSpecificCard } from '../core/claim/claimEngine';
-import { expandHome } from './controlRepoPath';
+import { projectRepoDir } from './projectRepoDir';
 
 /**
  * Launch a CLI worker on one card — the headline action the cockpit was missing (12 §3.3).
@@ -127,19 +125,17 @@ type TargetRepo =
  * is a config error we refuse loudly rather than silently building in the wrong tree.
  */
 function resolveTargetRepo(deps: LaunchDeps, card: Card): TargetRepo {
-  const configured = projectRepoPathFor(card, deps.config);
-  if (!configured) {
-    return { ok: true, repoPath: deps.root, git: deps.git };
+  const repoPath = projectRepoDir(card, deps.config, deps.root);
+  if (repoPath === deps.root) {
+    return { ok: true, repoPath, git: deps.git };
   }
-  const repoPath = resolve(deps.root, expandHome(configured, homedir()));
   if (!existsSync(repoPath)) {
     return {
       ok: false,
       reason: `Project repo "${card.project}" not found at ${repoPath}. Fix its path under project_repos in config.yml.`,
     };
   }
-  const git = repoPath === deps.root ? deps.git : new GitOps(execGitRunner, repoPath);
-  return { ok: true, repoPath, git };
+  return { ok: true, repoPath, git: new GitOps(execGitRunner, repoPath) };
 }
 
 /**

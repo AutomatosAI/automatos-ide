@@ -69,6 +69,12 @@
         "icon": "$(list-tree)"
       },
       {
+        "command": "automatos.syncReview",
+        "title": "Sync Review (advance merged PRs to Done)",
+        "category": "Automatos",
+        "icon": "$(git-merge)"
+      },
+      {
         "command": "automatos.consolidateMemory",
         "title": "Consolidate Memory",
         "category": "Automatos",
