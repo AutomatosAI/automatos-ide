@@ -1,14 +1,27 @@
+# Source + tooling — never shipped; dist/extension.js is the bundle.
 .vscode/**
 .vscode-test/**
+.git/**
 src/**
+scripts/**
 node_modules/**
 coverage/**
 docs/**
-.gitignore
-.vscodeignore
 esbuild.mjs
 tsconfig.json
 vitest.config.ts
+.gitignore
+.vscodeignore
+.npmrc
 **/*.test.ts
 **/*.ts.map
 **/*.map
+
+# Dev-only workspace artifacts created by `npm run seed` — must not ship.
+.automatos-worktrees/**
+.dev-workspace/**
+.dev-workspace-remote.git/**
+
+# Noise.
+**/.DS_Store
+*.vsix

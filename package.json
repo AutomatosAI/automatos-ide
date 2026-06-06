@@ -111,6 +111,8 @@
   },
   "scripts": {
     "build": "node esbuild.mjs",
+    "package": "vsce package --no-dependencies",
+    "package:install": "bash scripts/install-extension.sh",
     "watch": "node esbuild.mjs --watch",
     "seed": "node scripts/seed-dev-workspace.mjs",
     "typecheck": "tsc --noEmit",
@@ -123,11 +125,15 @@
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.90.0",
     "@vitest/coverage-v8": "^1.6.0",
+    "@vscode/vsce": "^2.32.0",
     "esbuild": "^0.21.5",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
   },
   "dependencies": {
     "yaml": "^2.9.0"
+  },
+  "overrides": {
+    "undici": "5.28.4"
   }
 }
