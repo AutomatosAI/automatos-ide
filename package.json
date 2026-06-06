@@ -19,23 +19,77 @@
     "workspaceContains:**/config.yml"
   ],
   "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "automatos",
+          "title": "Automatos",
+          "icon": "media/automatos.svg"
+        }
+      ]
+    },
+    "views": {
+      "automatos": [
+        {
+          "id": "automatosMenu",
+          "name": "Cockpit"
+        }
+      ]
+    },
     "commands": [
       {
         "command": "automatos.openBoard",
         "title": "Open Board",
-        "category": "Automatos"
+        "category": "Automatos",
+        "icon": "$(layout)"
       },
       {
         "command": "automatos.openChat",
         "title": "Open Team Chat",
-        "category": "Automatos"
+        "category": "Automatos",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "automatos.launchWorker",
+        "title": "Launch Worker on PRD",
+        "category": "Automatos",
+        "icon": "$(play)"
+      },
+      {
+        "command": "automatos.autoStatus",
+        "title": "AUTO Status",
+        "category": "Automatos",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "automatos.autoDecompose",
+        "title": "AUTO: Split PRD into Tasks",
+        "category": "Automatos",
+        "icon": "$(list-tree)"
       },
       {
         "command": "automatos.consolidateMemory",
         "title": "Consolidate Memory",
-        "category": "Automatos"
+        "category": "Automatos",
+        "icon": "$(archive)"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "automatos.openBoard",
+          "when": "view == automatosMenu",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "automatos.launchWorker",
+          "when": "view == automatosMenu && viewItem == automatosCard",
+          "group": "inline"
+        }
+      ]
+    }
   },
   "scripts": {
     "build": "node esbuild.mjs",

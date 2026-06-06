@@ -26,12 +26,20 @@ export interface LaunchOptions {
 interface EngineDef {
   readonly bin: string;
   readonly buildArgs: (prompt: string, skipPermissions: boolean) => string[];
+  /**
+   * Argv to open the engine INTERACTIVELY, seeded with the prompt — the manual-launch
+   * path. Unlike the headless `buildArgs` (one-shot, for the unattended supervisor), this
+   * drops the human into a live session they can watch and steer, so there is no
+   * skip-permissions flag: the engine asks the watching human in-session instead.
+   */
+  readonly interactiveArgs: (prompt: string) => string[];
 }
 
 const ENGINE_DEFS: Readonly<Record<string, EngineDef>> = {
   claude: {
     bin: 'claude',
     buildArgs: (prompt, skip) => ['-p', prompt, ...(skip ? ['--dangerously-skip-permissions'] : [])],
+    interactiveArgs: (prompt) => [prompt],
   },
   codex: {
     bin: 'codex',
@@ -44,10 +52,12 @@ const ENGINE_DEFS: Readonly<Record<string, EngineDef>> = {
       '--',
       prompt,
     ],
+    interactiveArgs: (prompt) => ['--', prompt],
   },
   gemini: {
     bin: 'gemini',
     buildArgs: (prompt, skip) => ['-p', prompt, ...(skip ? ['--yolo'] : [])],
+    interactiveArgs: (prompt) => ['-i', prompt],
   },
 };
 
@@ -68,6 +78,12 @@ export function buildLaunchCommand(
   const def = engineDef(engine);
   const skip = opts.skipPermissions ?? false;
   return { command: def.bin, args: def.buildArgs(prompt, skip) };
+}
+
+/** Build the argv to open an engine interactively, seeded with `prompt` (manual launch). */
+export function buildInteractiveLaunchCommand(engine: string, prompt: string): LaunchCommand {
+  const def = engineDef(engine);
+  return { command: def.bin, args: def.interactiveArgs(prompt) };
 }
 
 function engineDef(engine: string): EngineDef {

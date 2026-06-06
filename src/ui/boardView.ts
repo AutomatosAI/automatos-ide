@@ -7,10 +7,16 @@ import { escapeHtml } from './html';
  * Render a {@link Board} to webview HTML — the M0 cockpit view (13 §4).
  *
  * Pure: Board in, HTML string out, so the layout is unit-tested without a running VS
- * Code. Cards are draggable and each column is a drop zone; on drop the injected script
- * posts `{type:'move', id, to}` back to the extension, which performs the git mv (15 §2).
- * Every piece of card text is escaped — titles and owners are untrusted input.
+ * Code. The board is the hub: a toolbar posts `{type:'cmd', name}` (chat, AUTO, memory,
+ * refresh); cards are draggable drop targets that post `{type:'move', id, to}`; and every
+ * ready/in-progress card carries a ▶ button that posts `{type:'launch', id}` to spawn a
+ * worker. The extension performs the git side. Every piece of card text is escaped —
+ * titles and owners are untrusted input — and a CSP nonce gates the one inline script, so
+ * no inline handler runs; affordances are wired by addEventListener.
  */
+
+/** Statuses whose cards can be launched/resumed into a worker. */
+const LAUNCHABLE: ReadonlySet<CardStatus> = new Set<CardStatus>(['ready', 'in-progress']);
 
 const COLUMN_LABEL: Readonly<Record<CardStatus, string>> = {
   ready: 'Inbox',
@@ -42,10 +48,22 @@ export function renderBoardHtml(board: Board, options: BoardViewOptions = {}): s
   .card .id { font-size: 11px; opacity: 0.6; }
   .card .title { font-weight: 600; }
   .card .meta { font-size: 11px; opacity: 0.7; margin-top: 2px; }
+  .card .launch { margin-top: 6px; font-size: 11px; padding: 2px 8px; border: none; border-radius: 3px; cursor: pointer; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+  .card .launch:hover { background: var(--vscode-button-hoverBackground); }
   .empty { font-size: 12px; opacity: 0.4; font-style: italic; }
+  .toolbar { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+  .toolbar button { font-size: 12px; padding: 3px 10px; border: 1px solid var(--vscode-widget-border); border-radius: 4px; cursor: pointer; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+  .toolbar button:hover { background: var(--vscode-button-hoverBackground); }
 </style>
 </head>
 <body>
+<div class="toolbar">
+  <button data-cmd="chat">Team Chat</button>
+  <button data-cmd="auto">AUTO Status</button>
+  <button data-cmd="decompose">Split PRD</button>
+  <button data-cmd="memory">Consolidate Memory</button>
+  <button data-cmd="refresh">Refresh</button>
+</div>
 <div class="board">
 ${columns}
 </div>
@@ -65,6 +83,15 @@ ${columns}
       }
       dragId = null; dragFrom = null;
     });
+  }
+  for (const btn of document.querySelectorAll('.launch')) {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      vscode.postMessage({ type: 'launch', id: btn.dataset.id });
+    });
+  }
+  for (const btn of document.querySelectorAll('.toolbar button')) {
+    btn.addEventListener('click', () => vscode.postMessage({ type: 'cmd', name: btn.dataset.cmd }));
   }
 </script>
 </body>
@@ -88,9 +115,12 @@ function renderCard(card: Card): string {
     .filter((part): part is string => Boolean(part))
     .map(escapeHtml)
     .join(' · ');
+  const launch = LAUNCHABLE.has(card.status)
+    ? `\n    <button class="launch" data-id="${escapeHtml(card.id)}">▶ ${card.status === 'ready' ? 'Launch' : 'Resume'}</button>`
+    : '';
   return `<div class="card" draggable="true" data-id="${escapeHtml(card.id)}" data-status="${card.status}">
     <div class="id">${escapeHtml(card.id)}</div>
     <div class="title">${escapeHtml(card.title)}</div>
-    <div class="meta">${meta}</div>
+    <div class="meta">${meta}</div>${launch}
   </div>`;
 }

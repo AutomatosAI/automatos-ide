@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { claimNextCard, readReadyQueue, ClaimContext } from './claimEngine';
+import { claimNextCard, claimSpecificCard, readReadyQueue, ClaimContext } from './claimEngine';
+import { parseCard } from '../cards/frontmatter';
 import { serializeCard } from '../cards/frontmatter';
 import { GitOps } from '../../git/gitOps';
 import { FakeGitRunner, argStartsWith } from '../../test/fakeGit';
@@ -124,5 +125,35 @@ describe('claimNextCard — losing the race (the loser contract)', () => {
     await expect(claimNextCard(new GitOps(runner, CWD), store, ctx)).rejects.toThrow(
       /not a lost race/,
     );
+  });
+});
+
+describe('claimSpecificCard — the manual "launch on THIS card" CAS', () => {
+  it('claims the chosen card (not the top of the queue) on a winning push', async () => {
+    const runner = new FakeGitRunner();
+    const store = new FakeFileStore();
+    seedInbox(store, { id: 'PRD-1', priority: 1 }, { id: 'PRD-9', priority: 9 });
+    const target = parseCard(await store.read('prds/inbox/PRD-9.md'));
+
+    const claimed = await claimSpecificCard(new GitOps(runner, CWD), store, ctx, target);
+
+    expect(claimed?.id).toBe('PRD-9');
+    expect(claimed?.status).toBe('in-progress');
+    expect(claimed?.owner).toBe('agent-1');
+    expect(claimed?.branch).toBe('feat/PRD-9');
+    expect(runner.ran(argStartsWith('mv', 'prds/inbox/PRD-9.md', 'prds/in-progress/PRD-9.md'))).toBe(
+      true,
+    );
+  });
+
+  it('returns null when the chosen card was claimed first (lost race)', async () => {
+    const runner = new FakeGitRunner().on(argStartsWith('push'), REJECT);
+    const store = new FakeFileStore();
+    seedInbox(store, { id: 'PRD-1', priority: 1 });
+    const target = parseCard(await store.read('prds/inbox/PRD-1.md'));
+
+    const claimed = await claimSpecificCard(new GitOps(runner, CWD), store, ctx, target);
+
+    expect(claimed).toBeNull();
   });
 });

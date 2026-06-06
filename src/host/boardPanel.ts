@@ -70,16 +70,39 @@ export class BoardPanel {
   }
 
   private async onMessage(msg: unknown): Promise<void> {
-    if (!isMoveMessage(msg) || !isCardStatus(msg.to)) {
+    if (isLaunchMessage(msg)) {
+      await vscode.commands.executeCommand('automatos.launchWorker', msg.id);
+      await this.refresh();
       return;
     }
+    if (isCmdMessage(msg)) {
+      await this.runToolbarCommand(msg.name);
+      return;
+    }
+    if (isMoveMessage(msg) && isCardStatus(msg.to)) {
+      await this.move(msg.id, msg.to);
+    }
+  }
+
+  private async runToolbarCommand(name: string): Promise<void> {
+    const command = TOOLBAR_COMMANDS[name];
+    if (command) {
+      await vscode.commands.executeCommand(command);
+      return;
+    }
+    if (name === 'refresh') {
+      await this.refresh();
+    }
+  }
+
+  private async move(id: string, to: string): Promise<void> {
     const board = await readBoard(this.deps.store);
-    const card = findCard(board, msg.id);
-    if (!card) {
+    const card = findCard(board, id);
+    if (!card || !isCardStatus(to)) {
       return;
     }
     try {
-      const result = await moveCard(this.deps.git, this.deps.store, card, msg.to, {
+      const result = await moveCard(this.deps.git, this.deps.store, card, to, {
         now: new Date().toISOString(),
       });
       if (result.rejected) {
@@ -101,20 +124,38 @@ export class BoardPanel {
   }
 }
 
+/** Toolbar buttons that simply fan out to an already-registered command. */
+const TOOLBAR_COMMANDS: Readonly<Record<string, string>> = {
+  chat: 'automatos.openChat',
+  auto: 'automatos.autoStatus',
+  decompose: 'automatos.autoDecompose',
+  memory: 'automatos.consolidateMemory',
+};
+
 interface MoveMessage {
   readonly type: 'move';
   readonly id: string;
   readonly to: string;
 }
 
+function hasType(msg: unknown, type: string): msg is Record<string, unknown> {
+  return typeof msg === 'object' && msg !== null && (msg as { type?: unknown }).type === type;
+}
+
 function isMoveMessage(msg: unknown): msg is MoveMessage {
   return (
-    typeof msg === 'object' &&
-    msg !== null &&
-    (msg as { type?: unknown }).type === 'move' &&
+    hasType(msg, 'move') &&
     typeof (msg as { id?: unknown }).id === 'string' &&
     typeof (msg as { to?: unknown }).to === 'string'
   );
+}
+
+function isLaunchMessage(msg: unknown): msg is { type: 'launch'; id: string } {
+  return hasType(msg, 'launch') && typeof (msg as { id?: unknown }).id === 'string';
+}
+
+function isCmdMessage(msg: unknown): msg is { type: 'cmd'; name: string } {
+  return hasType(msg, 'cmd') && typeof (msg as { name?: unknown }).name === 'string';
 }
 
 function findCard(board: Board, id: string): Card | undefined {

@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { buildLaunchCommand, engineBinary, knownEngines } from './engineAdapter';
+import {
+  buildLaunchCommand,
+  buildInteractiveLaunchCommand,
+  engineBinary,
+  knownEngines,
+} from './engineAdapter';
 import { ENGINES } from '../config/config';
 
 describe('buildLaunchCommand', () => {
@@ -35,6 +40,27 @@ describe('buildLaunchCommand', () => {
 
   it('throws on an unknown engine', () => {
     expect(() => buildLaunchCommand('cursor', 'p')).toThrow(/unknown engine "cursor"/);
+  });
+});
+
+describe('buildInteractiveLaunchCommand', () => {
+  it('seeds an interactive session with the prompt and never bypasses permissions', () => {
+    expect(buildInteractiveLaunchCommand('claude', 'build PRD-1')).toEqual({
+      command: 'claude',
+      args: ['build PRD-1'],
+    });
+    expect(buildInteractiveLaunchCommand('codex', 'build PRD-1')).toEqual({
+      command: 'codex',
+      args: ['--', 'build PRD-1'],
+    });
+    expect(buildInteractiveLaunchCommand('gemini', 'build PRD-1')).toEqual({
+      command: 'gemini',
+      args: ['-i', 'build PRD-1'],
+    });
+  });
+
+  it('throws on an unknown engine', () => {
+    expect(() => buildInteractiveLaunchCommand('cursor', 'p')).toThrow(/unknown engine "cursor"/);
   });
 });
 

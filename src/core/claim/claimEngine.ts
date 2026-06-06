@@ -62,7 +62,7 @@ export async function claimNextCard(
       return null;
     }
     tried.add(next.id);
-    const won = await attemptClaim(git, store, ctx, next);
+    const won = await claimSpecificCard(git, store, ctx, next);
     if (won) {
       return won;
     }
@@ -72,7 +72,14 @@ export async function claimNextCard(
   }
 }
 
-async function attemptClaim(
+/**
+ * Claim ONE chosen card via the same CAS as {@link claimNextCard}: `git mv`
+ * inbox→in-progress, commit, push. Returns the claimed card, or null when the push lost
+ * the race (a teammate claimed it first) so the caller can refresh. Throws only on a hard
+ * push failure. This is the seam a manual "launch on this PRD" uses — the human picks the
+ * card instead of taking the top of the queue, but the lock is identical.
+ */
+export async function claimSpecificCard(
   git: GitOps,
   store: FileStore,
   ctx: ClaimContext,
