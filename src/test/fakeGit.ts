@@ -8,7 +8,12 @@ import { GitRunner, GitResult } from '../git/runner';
 
 interface ScriptedResponse {
   readonly match: (args: readonly string[]) => boolean;
-  readonly result: GitResult;
+  readonly results: readonly GitResult[];
+  next: number;
+}
+
+function fill(result: Partial<GitResult>): GitResult {
+  return { code: 0, stdout: '', stderr: '', ...result };
 }
 
 export class FakeGitRunner implements GitRunner {
@@ -16,20 +21,34 @@ export class FakeGitRunner implements GitRunner {
   private readonly responses: ScriptedResponse[] = [];
   private fallback: GitResult = { code: 0, stdout: '', stderr: '' };
 
-  on(match: (args: readonly string[]) => boolean, result: Partial<GitResult>): this {
-    this.responses.push({ match, result: { code: 0, stdout: '', stderr: '', ...result } });
+  /**
+   * Script a response for argv matching `match`. Pass an array to return different
+   * results on successive matches (the last element sticks) — e.g. `[reject, ok]` to
+   * model losing a push race once and then winning.
+   */
+  on(
+    match: (args: readonly string[]) => boolean,
+    result: Partial<GitResult> | readonly Partial<GitResult>[],
+  ): this {
+    const results = (Array.isArray(result) ? result : [result]).map(fill);
+    this.responses.push({ match, results, next: 0 });
     return this;
   }
 
   setDefault(result: Partial<GitResult>): this {
-    this.fallback = { code: 0, stdout: '', stderr: '', ...result };
+    this.fallback = fill(result);
     return this;
   }
 
   async run(args: readonly string[], cwd: string): Promise<GitResult> {
     this.calls.push({ args, cwd });
     const matched = this.responses.find((r) => r.match(args));
-    return matched ? matched.result : this.fallback;
+    if (!matched) {
+      return this.fallback;
+    }
+    const result = matched.results[Math.min(matched.next, matched.results.length - 1)];
+    matched.next += 1;
+    return result;
   }
 
   ran(predicate: (args: readonly string[]) => boolean): boolean {
