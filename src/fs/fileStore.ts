@@ -1,5 +1,5 @@
-import { readFile, writeFile, readdir } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, writeFile, readdir, mkdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 
 /**
  * The narrow seam between our logic and the real filesystem, rooted at one repo dir.
@@ -22,7 +22,11 @@ export function nodeFileStore(root: string): FileStore {
       return (await readFile(join(root, path))).toString();
     },
     async write(path, content) {
-      await writeFile(join(root, path), content);
+      const full = join(root, path);
+      // Create the queue folder on demand: a freshly-set control repo has no `prds/inbox/`
+      // yet, and the first New PRD (or heartbeat) must not ENOENT on a missing parent.
+      await mkdir(dirname(full), { recursive: true });
+      await writeFile(full, content);
     },
     async list(dir) {
       try {
