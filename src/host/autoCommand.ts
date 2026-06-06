@@ -7,6 +7,8 @@ import { columnCards } from '../core/board/board';
 import { cardPath } from '../core/board/layout';
 import { serializeCard } from '../core/cards/frontmatter';
 import { decomposePrd } from '../core/auto/decompose';
+import { readHeartbeats, stalenessThresholdMs } from '../core/heartbeat/heartbeat';
+import { workerLiveness, WorkerLiveness } from '../core/heartbeat/liveness';
 
 /**
  * AUTO's two surfaces in the cockpit (21 §2, 22 §3) — making the overseer visible.
@@ -27,12 +29,17 @@ function output(): vscode.OutputChannel {
   return channel;
 }
 
-export async function autoStatus(store: FileStore): Promise<void> {
+export async function autoStatus(store: FileStore, heartbeatIntervalSeconds: number): Promise<void> {
   const board = await readBoard(store);
   const ready = columnCards(board, 'ready');
   const inProgress = columnCards(board, 'in-progress');
   const review = columnCards(board, 'review');
   const done = columnCards(board, 'done');
+
+  const beats = await readHeartbeats(store);
+  const threshold = stalenessThresholdMs(heartbeatIntervalSeconds);
+  const liveness = workerLiveness(inProgress, beats, new Date().toISOString(), threshold);
+  const titleById = new Map(inProgress.map((card) => [card.id, card.title]));
 
   const out = output();
   out.clear();
@@ -52,19 +59,30 @@ export async function autoStatus(store: FileStore): Promise<void> {
   }
   out.appendLine('');
 
-  out.appendLine('In progress:');
-  if (inProgress.length === 0) {
+  out.appendLine('In progress (worker liveness):');
+  if (liveness.length === 0) {
     out.appendLine('  (no active workers)');
   } else {
-    for (const card of inProgress) {
-      out.appendLine(`  • ${card.id}  @${card.owner ?? '(unowned)'}  ${card.title}`);
+    for (const row of liveness) {
+      const title = titleById.get(row.cardId) ?? '';
+      out.appendLine(`  • ${row.cardId}  @${row.owner ?? '(unowned)'}  ${livenessLabel(row)}  ${title}`);
     }
   }
   out.appendLine('');
   out.appendLine('What I watch: a worker whose heartbeat goes stale → reclaim its card to ready;');
-  out.appendLine('a live worker stuck too long → escalate to a human. (Auto-reclaim runs once the');
-  out.appendLine('heartbeat loop is wired — until then this is a read-only view.)');
+  out.appendLine('a live worker stuck too long → escalate to a human. This view is read-only —');
+  out.appendLine('auto-reclaim stays off until workers emit heartbeats, so a "no heartbeat" worker');
+  out.appendLine('is reported as unknown, never reclaimed on a guess.');
   out.show(true);
+}
+
+/** Human-readable liveness for the status report: state plus how long since the last beat. */
+function livenessLabel(row: WorkerLiveness): string {
+  if (row.state === 'no-beat') {
+    return 'no heartbeat yet';
+  }
+  const seconds = row.sinceMs === null ? '?' : Math.round(row.sinceMs / 1000);
+  return `${row.state} (${seconds}s ago)`;
 }
 
 export async function autoDecompose(store: FileStore, git: GitOps, parent: Card): Promise<void> {

@@ -64,7 +64,7 @@ export function activate(context: vscode.ExtensionContext): void {
       withHost((host) => consolidateMemory(host.store, host.git)),
     ),
     vscode.commands.registerCommand('automatos.autoStatus', () =>
-      withHost((host) => autoStatus(host.store)),
+      withHost((host) => autoStatusFlow(host)),
     ),
     vscode.commands.registerCommand('automatos.autoDecompose', () =>
       withHost((host) => decomposeFlow(host)),
@@ -181,6 +181,12 @@ async function decomposeFlow(host: Host): Promise<void> {
   if (card) {
     await autoDecompose(host.store, host.git, card);
   }
+}
+
+/** Read-only AUTO overseer report, including worker liveness from heartbeats. */
+async function autoStatusFlow(host: Host): Promise<void> {
+  const config = await loadConfig(host.store);
+  await autoStatus(host.store, config.sync.heartbeatIntervalSeconds);
 }
 
 /** Advance review cards whose PR has merged to done, closing the board loop. */
