@@ -58,6 +58,7 @@ export function renderBoardHtml(board: Board, options: BoardViewOptions = {}): s
 </head>
 <body>
 <div class="toolbar">
+  <button data-cmd="newprd">+ New PRD</button>
   <button data-cmd="chat">Team Chat</button>
   <button data-cmd="auto">AUTO Status</button>
   <button data-cmd="decompose">Split PRD</button>

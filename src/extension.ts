@@ -9,6 +9,7 @@ import { ChatPanel } from './host/chatPanel';
 import { SettingsPanel } from './host/settingsPanel';
 import { consolidateMemory } from './host/memoryCommand';
 import { launchWorkerForCard } from './host/launchWorker';
+import { newPrd } from './host/newPrdCommand';
 import { autoStatus, autoDecompose } from './host/autoCommand';
 import { MenuTreeProvider } from './host/menuTree';
 import { Config, DEFAULT_CONFIG, parseConfig } from './core/config/config';
@@ -64,6 +65,9 @@ export function activate(context: vscode.ExtensionContext): void {
       withHost((host) => {
         SettingsPanel.show(context, { root: host.root, store: host.store });
       }),
+    ),
+    vscode.commands.registerCommand('automatos.newPrd', () =>
+      withHost((host) => newPrd(host.root, host.store, host.git)),
     ),
   );
 }

@@ -78,10 +78,21 @@
         "title": "Open Settings",
         "category": "Automatos",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "automatos.newPrd",
+        "title": "New PRD",
+        "category": "Automatos",
+        "icon": "$(add)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "automatos.newPrd",
+          "when": "view == automatosMenu",
+          "group": "navigation"
+        },
         {
           "command": "automatos.openBoard",
           "when": "view == automatosMenu",
