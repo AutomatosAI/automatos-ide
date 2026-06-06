@@ -1,0 +1,121 @@
+{
+  "name": "automatos-ide",
+  "displayName": "Automatos — Team Agent Cockpit",
+  "description": "Git-native multi-repo, multi-agent team coding cockpit: Kanban board + team chat, the AUTO orchestrator, and CLI workers — all coordinated through git, no server.",
+  "version": "0.0.1",
+  "publisher": "automatos",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=18.17.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/config.yml"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "automatos",
+          "title": "Automatos",
+          "icon": "media/automatos.svg"
+        }
+      ]
+    },
+    "views": {
+      "automatos": [
+        {
+          "id": "automatosMenu",
+          "name": "Cockpit"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "automatos.openBoard",
+        "title": "Open Board",
+        "category": "Automatos",
+        "icon": "$(layout)"
+      },
+      {
+        "command": "automatos.openChat",
+        "title": "Open Team Chat",
+        "category": "Automatos",
+        "icon": "$(comment-discussion)"
+      },
+      {
+        "command": "automatos.launchWorker",
+        "title": "Launch Worker on PRD",
+        "category": "Automatos",
+        "icon": "$(play)"
+      },
+      {
+        "command": "automatos.autoStatus",
+        "title": "AUTO Status",
+        "category": "Automatos",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "automatos.autoDecompose",
+        "title": "AUTO: Split PRD into Tasks",
+        "category": "Automatos",
+        "icon": "$(list-tree)"
+      },
+      {
+        "command": "automatos.consolidateMemory",
+        "title": "Consolidate Memory",
+        "category": "Automatos",
+        "icon": "$(archive)"
+      },
+      {
+        "command": "automatos.openSettings",
+        "title": "Open Settings",
+        "category": "Automatos",
+        "icon": "$(settings-gear)"
+      }
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "automatos.openBoard",
+          "when": "view == automatosMenu",
+          "group": "navigation"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "automatos.launchWorker",
+          "when": "view == automatosMenu && viewItem == automatosCard",
+          "group": "inline"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "seed": "node scripts/seed-dev-workspace.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "vscode:prepublish": "node esbuild.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.90.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  },
+  "dependencies": {
+    "yaml": "^2.9.0"
+  }
+}

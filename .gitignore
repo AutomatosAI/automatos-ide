@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+*.vsix
+.vscode-test/
+.DS_Store
+*.log
+
+# Throwaway control repo for F5 live-testing (see scripts/seed-dev-workspace.mjs)
+.dev-workspace/
+.dev-workspace-remote.git/
+
+# Per-worker git worktrees created when launching a CLI worker on a card
+.automatos-worktrees/
