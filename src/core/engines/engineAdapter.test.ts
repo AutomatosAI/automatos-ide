@@ -3,30 +3,34 @@ import { buildLaunchCommand, engineBinary, knownEngines } from './engineAdapter'
 import { ENGINES } from '../config/config';
 
 describe('buildLaunchCommand', () => {
-  it('launches claude in print mode, skipping permissions by default', () => {
-    expect(buildLaunchCommand('claude', 'build PRD-1')).toEqual({
+  it('keeps the permission gate by default (no bypass flag without an explicit opt-in)', () => {
+    expect(buildLaunchCommand('claude', 'build PRD-1').args).toEqual(['-p', 'build PRD-1']);
+    expect(buildLaunchCommand('codex', 'build PRD-1').args).toEqual(['exec', '--', 'build PRD-1']);
+    expect(buildLaunchCommand('gemini', 'build PRD-1').args).toEqual(['-p', 'build PRD-1']);
+  });
+
+  it('adds the per-engine bypass flag only on explicit skipPermissions', () => {
+    expect(buildLaunchCommand('claude', 'p', { skipPermissions: true })).toEqual({
       command: 'claude',
-      args: ['-p', 'build PRD-1', '--dangerously-skip-permissions'],
+      args: ['-p', 'p', '--dangerously-skip-permissions'],
     });
-  });
-
-  it('launches codex via exec with the prompt as the trailing positional', () => {
-    expect(buildLaunchCommand('codex', 'build PRD-1')).toEqual({
+    expect(buildLaunchCommand('codex', 'p', { skipPermissions: true })).toEqual({
       command: 'codex',
-      args: ['exec', '--dangerously-bypass-approvals-and-sandbox', 'build PRD-1'],
+      args: ['exec', '--dangerously-bypass-approvals-and-sandbox', '--', 'p'],
     });
-  });
-
-  it('launches gemini in prompt mode with --yolo', () => {
-    expect(buildLaunchCommand('gemini', 'build PRD-1')).toEqual({
+    expect(buildLaunchCommand('gemini', 'p', { skipPermissions: true })).toEqual({
       command: 'gemini',
-      args: ['-p', 'build PRD-1', '--yolo'],
+      args: ['-p', 'p', '--yolo'],
     });
   });
 
-  it('omits the skip-permission flag when asked to keep the gate', () => {
-    expect(buildLaunchCommand('claude', 'p', { skipPermissions: false }).args).toEqual(['-p', 'p']);
-    expect(buildLaunchCommand('codex', 'p', { skipPermissions: false }).args).toEqual(['exec', 'p']);
+  it('keeps a leading-dash prompt from smuggling a flag into codex (-- separator)', () => {
+    expect(buildLaunchCommand('codex', '--help me', { skipPermissions: true }).args).toEqual([
+      'exec',
+      '--dangerously-bypass-approvals-and-sandbox',
+      '--',
+      '--help me',
+    ]);
   });
 
   it('throws on an unknown engine', () => {

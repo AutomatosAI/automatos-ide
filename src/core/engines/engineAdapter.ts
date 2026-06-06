@@ -14,7 +14,12 @@ export interface LaunchCommand {
 }
 
 export interface LaunchOptions {
-  /** Skip the interactive permission gate for unattended runs. Default true. */
+  /**
+   * Skip the interactive permission gate (the `--dangerously-*` / `--yolo` flags).
+   * Defaults to FALSE: bypassing every guard is dangerous, so it must be an explicit,
+   * visible opt-in by the unattended supervisor — which only ever launches workers
+   * inside a throwaway per-card worktree, never the user's main checkout.
+   */
   readonly skipPermissions?: boolean;
 }
 
@@ -31,9 +36,12 @@ const ENGINE_DEFS: Readonly<Record<string, EngineDef>> = {
   codex: {
     bin: 'codex',
     // codex takes flags before the positional prompt; exec is the non-interactive path.
+    // The `--` terminates flag parsing so a PRD whose text starts with `-` can never be
+    // smuggled in as an argument (flag injection).
     buildArgs: (prompt, skip) => [
       'exec',
       ...(skip ? ['--dangerously-bypass-approvals-and-sandbox'] : []),
+      '--',
       prompt,
     ],
   },
@@ -58,7 +66,7 @@ export function buildLaunchCommand(
   opts: LaunchOptions = {},
 ): LaunchCommand {
   const def = engineDef(engine);
-  const skip = opts.skipPermissions ?? true;
+  const skip = opts.skipPermissions ?? false;
   return { command: def.bin, args: def.buildArgs(prompt, skip) };
 }
 
