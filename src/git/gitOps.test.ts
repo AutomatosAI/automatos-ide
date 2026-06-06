@@ -68,6 +68,13 @@ describe('GitOps mutations', () => {
 });
 
 describe('GitOps reads + errors', () => {
+  it('currentBranch returns the trimmed rev-parse output', async () => {
+    const runner = new FakeGitRunner().on(argStartsWith('rev-parse', '--abbrev-ref', 'HEAD'), {
+      stdout: 'master\n',
+    });
+    expect(await new GitOps(runner, CWD).currentBranch()).toBe('master');
+  });
+
   it('listFiles splits ls-files output into trimmed names', async () => {
     const runner = new FakeGitRunner().on(argHas('ls-files'), {
       stdout: 'prds/inbox/a.md\nprds/inbox/b.md\n\n',

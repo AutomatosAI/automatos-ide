@@ -1,16 +1,20 @@
 import * as vscode from 'vscode';
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { FileStore } from '../fs/fileStore';
 import { GitOps } from '../git/gitOps';
+import { execGitRunner } from '../git/runner';
 import { Config } from '../core/config/config';
 import { Card } from '../core/cards/card';
 import { EngineProbe, preflightEngine } from '../core/engines/preflight';
 import { buildInteractiveLaunchCommand } from '../core/engines/engineAdapter';
 import { engineForCard, branchForCard } from '../core/supervisor/supervisorPlan';
 import { buildWorkerPrompt } from '../core/worker/workerPrompt';
+import { projectRepoPathFor } from '../core/worker/projectRepo';
 import { toShellCommandLine } from '../core/worker/launchShell';
 import { claimSpecificCard } from '../core/claim/claimEngine';
+import { expandHome } from './controlRepoPath';
 
 /**
  * Launch a CLI worker on one card — the headline action the cockpit was missing (12 §3.3).
@@ -18,14 +22,16 @@ import { claimSpecificCard } from '../core/claim/claimEngine';
  * Boundary glue, so NOT unit-tested (no Extension Host under vitest); every decision it
  * makes is delegated to covered core — preflight, the claim CAS, the worker prompt, the
  * injection-safe shell line. The shape is: refuse an engine we can't run, take the card
- * via the same git lock a teammate would, give the worker its own worktree so it never
- * touches the user's checkout, then drop the human into a live engine session they can
- * watch and steer. Subscription login is ambient in `~/.<engine>`, so nothing here ever
- * sees a key.
+ * via the same git lock a teammate would, resolve the repo the card's `project` targets
+ * (NOT always the control repo — this is what makes the cockpit multi-repo), give the
+ * worker its own worktree there so it never touches the user's checkout, then drop the
+ * human into a live engine session they can watch and steer. Subscription login is
+ * ambient in `~/.<engine>`, so nothing here ever sees a key.
  */
 
 const WORKTREE_DIRNAME = '.automatos-worktrees';
-const BASE_BRANCH = 'main';
+/** Fallback PR base only when the target repo's branch can't be read (e.g. detached HEAD). */
+const FALLBACK_BASE_BRANCH = 'main';
 
 export interface LaunchDeps {
   readonly root: string;
@@ -54,10 +60,16 @@ export async function launchWorkerForCard(deps: LaunchDeps, card: Card): Promise
   const claimed = claim.card;
   const branch = claimed.branch ?? branchForCard(card.id);
 
-  const worktreePath = resolve(deps.root, '..', WORKTREE_DIRNAME, card.id);
+  const target = resolveTargetRepo(deps, claimed);
+  if (!target.ok) {
+    vscode.window.showErrorMessage(target.reason);
+    return;
+  }
+
+  const worktreePath = resolve(target.repoPath, '..', WORKTREE_DIRNAME, card.id);
   try {
     if (!existsSync(worktreePath)) {
-      await deps.git.worktreeAdd(worktreePath, branch, 'HEAD');
+      await target.git.worktreeAdd(worktreePath, branch, 'HEAD');
     }
   } catch (error) {
     vscode.window.showErrorMessage(
@@ -66,7 +78,8 @@ export async function launchWorkerForCard(deps: LaunchDeps, card: Card): Promise
     return;
   }
 
-  const prompt = buildWorkerPrompt(claimed, { branch, baseBranch: BASE_BRANCH });
+  const baseBranch = await resolveBaseBranch(target.git);
+  const prompt = buildWorkerPrompt(claimed, { branch, baseBranch });
   const { command, args } = buildInteractiveLaunchCommand(engine, prompt);
   const terminal = vscode.window.createTerminal({ name: `${engine} · ${card.id}`, cwd: worktreePath });
   terminal.show();
@@ -100,4 +113,45 @@ async function resolveClaim(deps: LaunchDeps, card: Card): Promise<ClaimOutcome>
     return { ok: false, reason: `${card.id} was claimed by a teammate first — board refreshed.` };
   }
   return { ok: true, card: claimed };
+}
+
+type TargetRepo =
+  | { readonly ok: true; readonly repoPath: string; readonly git: GitOps }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * The repo this card builds in. A card whose `project` maps to a `project_repos` entry
+ * (14 §8) builds in THAT repo — `~` is expanded and a relative path is resolved against
+ * the control root, so config can be terse. A missing or unmatched project falls back to
+ * the control repo itself (single-repo boards still work). A configured-but-absent path
+ * is a config error we refuse loudly rather than silently building in the wrong tree.
+ */
+function resolveTargetRepo(deps: LaunchDeps, card: Card): TargetRepo {
+  const configured = projectRepoPathFor(card, deps.config);
+  if (!configured) {
+    return { ok: true, repoPath: deps.root, git: deps.git };
+  }
+  const repoPath = resolve(deps.root, expandHome(configured, homedir()));
+  if (!existsSync(repoPath)) {
+    return {
+      ok: false,
+      reason: `Project repo "${card.project}" not found at ${repoPath}. Fix its path under project_repos in config.yml.`,
+    };
+  }
+  const git = repoPath === deps.root ? deps.git : new GitOps(execGitRunner, repoPath);
+  return { ok: true, repoPath, git };
+}
+
+/**
+ * The branch the worker forks from is the branch it should PR back into, so read it from
+ * the target repo. A detached HEAD (or any read failure) has no PR-able base, so we fall
+ * back to `main` rather than telling the worker to target the literal string "HEAD".
+ */
+async function resolveBaseBranch(git: GitOps): Promise<string> {
+  try {
+    const branch = await git.currentBranch();
+    return branch && branch !== 'HEAD' ? branch : FALLBACK_BASE_BRANCH;
+  } catch {
+    return FALLBACK_BASE_BRANCH;
+  }
 }

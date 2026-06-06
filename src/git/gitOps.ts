@@ -69,6 +69,16 @@ export class GitOps {
     await this.expect(['worktree', 'add', '-b', branch, path, base], 'worktree add');
   }
 
+  /**
+   * The checked-out branch name — the base a worker should fork from and PR back into.
+   * A detached HEAD reports as `HEAD`; callers treat that as "no usable base" and fall
+   * back to a default, since you can't open a PR against a detached commit.
+   */
+  async currentBranch(): Promise<string> {
+    const result = await this.expect(['rev-parse', '--abbrev-ref', 'HEAD'], 'rev-parse HEAD');
+    return result.stdout.trim();
+  }
+
   async worktreePrune(): Promise<void> {
     await this.expect(['worktree', 'prune'], 'worktree prune');
   }
