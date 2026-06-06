@@ -130,6 +130,7 @@ const TOOLBAR_COMMANDS: Readonly<Record<string, string>> = {
   auto: 'automatos.autoStatus',
   decompose: 'automatos.autoDecompose',
   memory: 'automatos.consolidateMemory',
+  settings: 'automatos.openSettings',
 };
 
 interface MoveMessage {

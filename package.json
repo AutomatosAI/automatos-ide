@@ -72,6 +72,12 @@
         "title": "Consolidate Memory",
         "category": "Automatos",
         "icon": "$(archive)"
+      },
+      {
+        "command": "automatos.openSettings",
+        "title": "Open Settings",
+        "category": "Automatos",
+        "icon": "$(settings-gear)"
       }
     ],
     "menus": {

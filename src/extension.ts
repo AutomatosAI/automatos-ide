@@ -6,6 +6,7 @@ import { CONFIG_FILENAME, controlRepoRoot } from './host/workspace';
 import { currentHuman } from './host/githubAuth';
 import { BoardPanel } from './host/boardPanel';
 import { ChatPanel } from './host/chatPanel';
+import { SettingsPanel } from './host/settingsPanel';
 import { consolidateMemory } from './host/memoryCommand';
 import { launchWorkerForCard } from './host/launchWorker';
 import { autoStatus, autoDecompose } from './host/autoCommand';
@@ -58,6 +59,11 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('automatos.launchWorker', (arg: unknown) =>
       withHost((host) => launchFlow(host, arg)),
+    ),
+    vscode.commands.registerCommand('automatos.openSettings', () =>
+      withHost((host) => {
+        SettingsPanel.show(context, { root: host.root, store: host.store });
+      }),
     ),
   );
 }

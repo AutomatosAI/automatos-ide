@@ -62,6 +62,7 @@ export function renderBoardHtml(board: Board, options: BoardViewOptions = {}): s
   <button data-cmd="auto">AUTO Status</button>
   <button data-cmd="decompose">Split PRD</button>
   <button data-cmd="memory">Consolidate Memory</button>
+  <button data-cmd="settings">Settings</button>
   <button data-cmd="refresh">Refresh</button>
 </div>
 <div class="board">

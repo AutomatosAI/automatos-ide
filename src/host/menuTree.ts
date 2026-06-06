@@ -28,6 +28,7 @@ const ACTIONS: readonly { label: string; commandId: string; icon: string }[] = [
   { label: 'AUTO Status', commandId: 'automatos.autoStatus', icon: 'pulse' },
   { label: 'Split a PRD into tasks', commandId: 'automatos.autoDecompose', icon: 'list-tree' },
   { label: 'Consolidate Memory', commandId: 'automatos.consolidateMemory', icon: 'archive' },
+  { label: 'Settings', commandId: 'automatos.openSettings', icon: 'settings-gear' },
 ];
 
 export class MenuTreeProvider implements vscode.TreeDataProvider<MenuNode> {
