@@ -1,0 +1,57 @@
+{
+  "name": "automatos-ide",
+  "displayName": "Automatos — Team Agent Cockpit",
+  "description": "Git-native multi-repo, multi-agent team coding cockpit: Kanban board + team chat, the AUTO orchestrator, and CLI workers — all coordinated through git, no server.",
+  "version": "0.0.1",
+  "publisher": "automatos",
+  "private": true,
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0",
+    "node": ">=18.17.0"
+  },
+  "categories": [
+    "Other",
+    "SCM Providers"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "workspaceContains:**/config.yml"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "automatos.openBoard",
+        "title": "Open Board",
+        "category": "Automatos"
+      },
+      {
+        "command": "automatos.openChat",
+        "title": "Open Team Chat",
+        "category": "Automatos"
+      },
+      {
+        "command": "automatos.consolidateMemory",
+        "title": "Consolidate Memory",
+        "category": "Automatos"
+      }
+    ]
+  },
+  "scripts": {
+    "build": "node esbuild.mjs",
+    "watch": "node esbuild.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "vscode:prepublish": "node esbuild.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.90.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5",
+    "vitest": "^1.6.0"
+  }
+}
