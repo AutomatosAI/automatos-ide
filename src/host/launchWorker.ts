@@ -13,6 +13,7 @@ import { buildWorkerPrompt } from '../core/worker/workerPrompt';
 import { toShellCommandLine } from '../core/worker/launchShell';
 import { claimSpecificCard } from '../core/claim/claimEngine';
 import { projectRepoDir } from './projectRepoDir';
+import { startHeartbeat } from './heartbeatBeater';
 
 /**
  * Launch a CLI worker on one card — the headline action the cockpit was missing (12 §3.3).
@@ -82,6 +83,17 @@ export async function launchWorkerForCard(deps: LaunchDeps, card: Card): Promise
   const terminal = vscode.window.createTerminal({ name: `${engine} · ${card.id}`, cwd: worktreePath });
   terminal.show();
   terminal.sendText(toShellCommandLine(command, args));
+
+  // Beat to the CONTROL repo's local `.heartbeats/` (deps.store), not the worktree — that
+  // is where AUTO reads liveness. Self-stops when this terminal closes.
+  startHeartbeat({
+    store: deps.store,
+    agent: deps.me,
+    cardId: card.id,
+    intervalSeconds: deps.config.sync.heartbeatIntervalSeconds,
+    terminal,
+  });
+
   vscode.window.showInformationMessage(`Launched ${engine} on ${card.id} — ${card.title}`);
 }
 

@@ -26,6 +26,16 @@ export function heartbeatPath(agent: string): string {
   return `${HEARTBEATS_DIR}/${agent}.json`;
 }
 
+/**
+ * The beat FILE is keyed by card, not agent: one human launching three workers would
+ * otherwise have all three overwrite a single `<agent>.json` and erase each other's
+ * liveness. The card id is unique per worker, so `<card>.json` keeps them distinct. The
+ * beat's `card` field still drives the join in {@link readHeartbeats} consumers.
+ */
+export function heartbeatPathForCard(cardId: string): string {
+  return `${HEARTBEATS_DIR}/${cardId}.json`;
+}
+
 /** Milliseconds AUTO waits past the beat interval before presuming a worker dead. */
 export function stalenessThresholdMs(intervalSeconds: number, missedBeats = 3): number {
   return intervalSeconds * missedBeats * 1000;

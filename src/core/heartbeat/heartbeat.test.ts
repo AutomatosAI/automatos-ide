@@ -10,6 +10,7 @@ import {
   readHeartbeats,
   staleAgents,
   heartbeatPath,
+  heartbeatPathForCard,
 } from './heartbeat';
 import { FakeFileStore } from '../../test/fakeFs';
 
@@ -39,6 +40,27 @@ describe('heartbeat serialize/parse round-trip', () => {
     expect(() => parseHeartbeat('{"agent":"a","status":"x","at":"not-a-date"}')).toThrow(
       /not a valid timestamp/,
     );
+  });
+});
+
+describe('heartbeat file paths', () => {
+  it('keys the agent path by agent', () => {
+    expect(heartbeatPath('worker-7')).toBe('.heartbeats/worker-7.json');
+  });
+
+  it('keys the card path by card id so concurrent workers never collide', () => {
+    expect(heartbeatPathForCard('PRD-0007')).toBe('.heartbeats/PRD-0007.json');
+    expect(heartbeatPathForCard('PRD-1')).not.toBe(heartbeatPathForCard('PRD-2'));
+  });
+
+  it('lands in the dir readHeartbeats scans, so a card-keyed beat is discoverable', async () => {
+    const store = new FakeFileStore();
+    store.seed(
+      heartbeatPathForCard('PRD-9'),
+      serializeHeartbeat(beat({ agent: 'ann', card: 'PRD-9' })),
+    );
+    const all = await readHeartbeats(store);
+    expect(all.map((b) => b.card)).toEqual(['PRD-9']);
   });
 });
 

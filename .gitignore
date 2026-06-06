@@ -12,3 +12,7 @@ coverage/
 
 # Per-worker git worktrees created when launching a CLI worker on a card
 .automatos-worktrees/
+
+# Local worker heartbeats — liveness is "is the engine terminal still open" on THIS
+# machine, so beats stay local and are never committed (no cross-machine git thrash).
+.heartbeats/
