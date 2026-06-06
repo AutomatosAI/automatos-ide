@@ -75,6 +75,12 @@
         "icon": "$(git-merge)"
       },
       {
+        "command": "automatos.reclaimStale",
+        "title": "Reclaim Stale Workers",
+        "category": "Automatos",
+        "icon": "$(debug-restart)"
+      },
+      {
         "command": "automatos.consolidateMemory",
         "title": "Consolidate Memory",
         "category": "Automatos",

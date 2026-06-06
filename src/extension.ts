@@ -13,6 +13,7 @@ import { newPrd } from './host/newPrdCommand';
 import { selectControlRepo } from './host/selectControlRepo';
 import { autoStatus, autoDecompose } from './host/autoCommand';
 import { syncReview } from './host/syncReview';
+import { reclaimStaleWorkers } from './host/reclaimWorkers';
 import { execCommandRunner } from './proc/commandRunner';
 import { MenuTreeProvider } from './host/menuTree';
 import { Config, DEFAULT_CONFIG, parseConfig } from './core/config/config';
@@ -71,6 +72,9 @@ export function activate(context: vscode.ExtensionContext): void {
     ),
     vscode.commands.registerCommand('automatos.syncReview', () =>
       withHost((host) => syncReviewFlow(host)),
+    ),
+    vscode.commands.registerCommand('automatos.reclaimStale', () =>
+      withHost((host) => reclaimFlow(host)),
     ),
     vscode.commands.registerCommand('automatos.launchWorker', (arg: unknown) =>
       withHost((host) => launchFlow(host, arg)),
@@ -187,6 +191,18 @@ async function decomposeFlow(host: Host): Promise<void> {
 async function autoStatusFlow(host: Host): Promise<void> {
   const config = await loadConfig(host.store);
   await autoStatus(host.store, config.sync.heartbeatIntervalSeconds);
+}
+
+/** Surface stale workers (dead heartbeat) and reclaim the ones the human confirms. */
+async function reclaimFlow(host: Host): Promise<void> {
+  const config = await loadConfig(host.store);
+  await reclaimStaleWorkers({
+    root: host.root,
+    store: host.store,
+    git: host.git,
+    config,
+    now: () => new Date().toISOString(),
+  });
 }
 
 /** Advance review cards whose PR has merged to done, closing the board loop. */
