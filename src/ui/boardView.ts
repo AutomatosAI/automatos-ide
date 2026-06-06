@@ -54,9 +54,27 @@ export function renderBoardHtml(board: Board, options: BoardViewOptions = {}): s
   .toolbar { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
   .toolbar button { font-size: 12px; padding: 3px 10px; border: 1px solid var(--vscode-widget-border); border-radius: 4px; cursor: pointer; background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
   .toolbar button:hover { background: var(--vscode-button-hoverBackground); }
+  .brand { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .brand-logo { width: 22px; height: 22px; border-radius: 5px; display: block; }
+  .brand-name { font-size: 15px; font-weight: 700; letter-spacing: 0.2px; }
+  .brand-tag { font-size: 11px; opacity: 0.5; }
 </style>
 </head>
 <body>
+<header class="brand">
+  <svg class="brand-logo" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <rect width="256" height="256" rx="24" fill="url(#brandGrad)"/>
+    <path d="M160.99 204.507L69.0508 205.138L62.0811 188.532L194.972 177.929L160.99 204.507ZM115.631 174.64C95.9516 173.895 84.3043 174.639 61.0293 176.463C74.5047 155.234 103.609 106.893 112.224 83.3545L115.631 174.64ZM127.081 49.7773C154.399 95.7732 187.433 152.461 193.68 165.008C170.069 166.884 155.669 168.286 131.624 171.49L127.081 49.7773Z" fill="#EBEBEB"/>
+    <defs>
+      <linearGradient id="brandGrad" x1="205.813" y1="272.744" x2="98.7565" y2="-15.4346" gradientUnits="userSpaceOnUse">
+        <stop stop-color="#D53B00"/>
+        <stop offset="1" stop-color="#FF6A02"/>
+      </linearGradient>
+    </defs>
+  </svg>
+  <span class="brand-name">Automatos</span>
+  <span class="brand-tag">team agent cockpit</span>
+</header>
 <div class="toolbar">
   <button data-cmd="newprd">+ New PRD</button>
   <button data-cmd="chat">Team Chat</button>

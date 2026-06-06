@@ -6,6 +6,7 @@
   "publisher": "automatos",
   "private": true,
   "license": "MIT",
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.90.0",
     "node": ">=18.17.0"
