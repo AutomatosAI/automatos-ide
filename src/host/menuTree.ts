@@ -14,7 +14,9 @@ import { cardPath } from '../core/board/layout';
  * lives in the sidebar, so it stays reachable while you edit ANY repo in a multi-root
  * workspace — you never have to re-open the control repo to drive the team. A
  * FileSystemWatcher (wired by the caller) calls {@link refresh} when a teammate's push
- * lands, so the queue reflects shared git state, not local memory.
+ * lands, so the queue reflects shared git state, not local memory. With no control repo
+ * resolved yet, the tree still offers a "Set control repo" action so the sidebar is never
+ * a dead end.
  */
 
 type MenuNode =
@@ -30,15 +32,24 @@ const ACTIONS: readonly { label: string; commandId: string; icon: string }[] = [
   { label: 'Split a PRD into tasks', commandId: 'automatos.autoDecompose', icon: 'list-tree' },
   { label: 'Consolidate Memory', commandId: 'automatos.consolidateMemory', icon: 'archive' },
   { label: 'Settings', commandId: 'automatos.openSettings', icon: 'settings-gear' },
+  { label: 'Set Control Repo', commandId: 'automatos.selectControlRepo', icon: 'root-folder' },
 ];
+
+/** Shown when no control repo is resolved yet — the only way out of an empty sidebar. */
+const BOOTSTRAP_ACTION: MenuNode = {
+  kind: 'action',
+  label: 'Set control repo to get started',
+  commandId: 'automatos.selectControlRepo',
+  icon: 'root-folder',
+};
 
 export class MenuTreeProvider implements vscode.TreeDataProvider<MenuNode> {
   private readonly emitter = new vscode.EventEmitter<void>();
   readonly onDidChangeTreeData = this.emitter.event;
 
   constructor(
-    private readonly root: string,
-    private readonly store: FileStore,
+    private readonly root: string | undefined,
+    private readonly store: FileStore | undefined,
   ) {}
 
   refresh(): void {
@@ -69,13 +80,16 @@ export class MenuTreeProvider implements vscode.TreeDataProvider<MenuNode> {
     item.command = {
       command: 'vscode.open',
       title: 'Open PRD',
-      arguments: [vscode.Uri.file(join(this.root, cardPath(card.status, card.id)))],
+      arguments: [vscode.Uri.file(join(this.root ?? '', cardPath(card.status, card.id)))],
     };
     return item;
   }
 
   async getChildren(node?: MenuNode): Promise<MenuNode[]> {
     if (!node) {
+      if (!this.root || !this.store) {
+        return [BOOTSTRAP_ACTION];
+      }
       return [
         ...ACTIONS.map((a) => ({ kind: 'action', ...a }) as MenuNode),
         { kind: 'group', label: 'Ready to launch', status: 'ready', icon: 'inbox' },
@@ -83,6 +97,9 @@ export class MenuTreeProvider implements vscode.TreeDataProvider<MenuNode> {
       ];
     }
     if (node.kind === 'group') {
+      if (!this.store) {
+        return [];
+      }
       const board = await readBoard(this.store);
       return columnCards(board, node.status).map((card) => ({ kind: 'card', card }) as MenuNode);
     }

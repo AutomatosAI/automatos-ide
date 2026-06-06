@@ -10,6 +10,7 @@ import { SettingsPanel } from './host/settingsPanel';
 import { consolidateMemory } from './host/memoryCommand';
 import { launchWorkerForCard } from './host/launchWorker';
 import { newPrd } from './host/newPrdCommand';
+import { selectControlRepo } from './host/selectControlRepo';
 import { autoStatus, autoDecompose } from './host/autoCommand';
 import { MenuTreeProvider } from './host/menuTree';
 import { Config, DEFAULT_CONFIG, parseConfig } from './core/config/config';
@@ -21,19 +22,27 @@ import { Card } from './core/cards/card';
 import { PRDS_ROOT } from './core/board/layout';
 
 /**
- * Extension entry point. Activation is gated on `workspaceContains` the control repo's
- * `config.yml` (see package.json) so the cockpit only wakes inside a control repo.
+ * Extension entry point. The Activity Bar menu is contributed statically, so the Automatos
+ * icon is present in EVERY window; clicking it activates us. The control repo is resolved
+ * from the `automatos.controlRepoPath` setting first (so you can drive one board while you
+ * edit any other repo), then by auto-detecting a `config.yml` in the open workspace — and
+ * the menu rebuilds when that setting changes.
  *
  * Each command resolves a fresh {@link Host} (root + FileStore + GitOps over the real
- * binaries) and hands it to the relevant subsystem. The Activity Bar menu is the always-
- * present home: board, chat, memory, AUTO, and the launchable queue, reachable while you
- * edit any repo in a multi-root workspace. All durable state lives in git, never in
- * extension memory, so `deactivate` is a no-op by design.
+ * binaries) and hands it to the relevant subsystem. All durable state lives in git, never
+ * in extension memory, so `deactivate` is a no-op by design.
  */
 export function activate(context: vscode.ExtensionContext): void {
-  void registerMenu(context);
+  void buildMenu();
 
   context.subscriptions.push(
+    { dispose: () => disposeMenu() },
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('automatos.controlRepoPath')) {
+        void buildMenu();
+      }
+    }),
+    vscode.commands.registerCommand('automatos.selectControlRepo', () => selectControlRepo()),
     vscode.commands.registerCommand('automatos.openBoard', () =>
       withHost((host) => {
         BoardPanel.show(context, host);
@@ -84,13 +93,21 @@ interface Host {
 
 /**
  * Resolve the control repo and run `fn` against it, surfacing any failure as a notification
- * instead of an unhandled rejection. Built per-invocation so a repo opened after activation
- * is always picked up fresh.
+ * instead of an unhandled rejection. Built per-invocation so a repo opened (or a path set)
+ * after activation is always picked up fresh. With no control repo, the error is actionable
+ * — it offers the folder picker rather than leaving the user stuck.
  */
 async function withHost(fn: (host: Host) => void | Promise<void>): Promise<void> {
   const root = await controlRepoRoot();
   if (!root) {
-    vscode.window.showErrorMessage('Automatos: no control repo (config.yml) found in the workspace.');
+    const pick = 'Select Control Repo';
+    const choice = await vscode.window.showErrorMessage(
+      'Automatos: no control repo found. Set one, or open a workspace that contains config.yml.',
+      pick,
+    );
+    if (choice === pick) {
+      await selectControlRepo();
+    }
     return;
   }
   const host: Host = { root, store: nodeFileStore(root), git: new GitOps(execGitRunner, root) };
@@ -101,21 +118,37 @@ async function withHost(fn: (host: Host) => void | Promise<void>): Promise<void>
   }
 }
 
-/** Build the Activity Bar menu over the control repo and keep it fresh on board changes. */
-async function registerMenu(context: vscode.ExtensionContext): Promise<void> {
+const menuDisposables: vscode.Disposable[] = [];
+
+/**
+ * Build (or rebuild) the Activity Bar menu over the current control repo. Safe to call
+ * repeatedly — it disposes the previous view/watcher first — so we re-run it whenever the
+ * `automatos.controlRepoPath` setting changes and the board should now point elsewhere.
+ * When no control repo is resolved yet, the provider still renders a bootstrap action so
+ * the sidebar is never a dead end.
+ */
+async function buildMenu(): Promise<void> {
+  disposeMenu();
   const root = await controlRepoRoot();
-  if (!root) {
-    return;
-  }
-  const provider = new MenuTreeProvider(root, nodeFileStore(root));
-  const view = vscode.window.createTreeView('automatosMenu', { treeDataProvider: provider });
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(root, `${PRDS_ROOT}/**`),
+  const provider = new MenuTreeProvider(root, root ? nodeFileStore(root) : undefined);
+  menuDisposables.push(
+    vscode.window.createTreeView('automatosMenu', { treeDataProvider: provider }),
   );
-  watcher.onDidChange(() => provider.refresh());
-  watcher.onDidCreate(() => provider.refresh());
-  watcher.onDidDelete(() => provider.refresh());
-  context.subscriptions.push(view, watcher);
+  if (root) {
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(root, `${PRDS_ROOT}/**`),
+    );
+    watcher.onDidChange(() => provider.refresh());
+    watcher.onDidCreate(() => provider.refresh());
+    watcher.onDidDelete(() => provider.refresh());
+    menuDisposables.push(watcher);
+  }
+}
+
+function disposeMenu(): void {
+  for (const d of menuDisposables.splice(0)) {
+    d.dispose();
+  }
 }
 
 /** Launch a worker on a card chosen by arg (tree node / board id) or via a QuickPick. */

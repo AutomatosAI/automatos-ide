@@ -85,6 +85,12 @@
         "title": "New PRD",
         "category": "Automatos",
         "icon": "$(add)"
+      },
+      {
+        "command": "automatos.selectControlRepo",
+        "title": "Select Control Repo Folder",
+        "category": "Automatos",
+        "icon": "$(root-folder)"
       }
     ],
     "menus": {
@@ -107,6 +113,17 @@
           "group": "inline"
         }
       ]
+    },
+    "configuration": {
+      "title": "Automatos",
+      "properties": {
+        "automatos.controlRepoPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Absolute path to your Automatos **control repo** — the folder with `config.yml`, `prds/`, `chat/`, and `memory/`. When set, the cockpit drives that board from **any** window, so you can work in other repos without opening the control repo as your workspace. Leave blank to auto-detect a `config.yml` in the current workspace. `~` expands to your home directory. Tip: run **Automatos: Select Control Repo Folder** to set this with a picker."
+        }
+      }
     }
   },
   "scripts": {
