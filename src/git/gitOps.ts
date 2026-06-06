@@ -39,6 +39,10 @@ export class GitOps {
     await this.expect(['commit', '-m', message], 'commit');
   }
 
+  async rm(paths: readonly string[]): Promise<void> {
+    await this.expect(['rm', '--', ...paths], 'rm');
+  }
+
   async push(): Promise<PushResult> {
     const result = await this.runner.run(['push'], this.cwd);
     if (result.code === 0) {

@@ -1,5 +1,6 @@
 import { FileStore } from '../../fs/fileStore';
-import { Note, notePath, readAgentNotes } from './notes';
+import { GitOps } from '../../git/gitOps';
+import { Note, notePath, serializeNote, readAgentNotes } from './notes';
 
 /**
  * Memory consolidation — folding an agent's cold notes into one digest (23 §3).
@@ -100,6 +101,23 @@ export async function planConsolidationFor(
   keepRecent: number = DEFAULT_KEEP_RECENT,
 ): Promise<ConsolidationPlan | null> {
   return planConsolidation(agent, await readAgentNotes(store, agent), ctx, keepRecent);
+}
+
+/**
+ * Apply a plan to the repo: write the digest note, then `git rm` the folded originals
+ * and stage the digest. The caller commits and pushes (one commit for the whole run).
+ */
+export async function applyConsolidation(
+  git: GitOps,
+  store: FileStore,
+  plan: ConsolidationPlan,
+): Promise<void> {
+  const digestPath = notePath(plan.digest.agent, plan.digest.at);
+  await store.write(digestPath, serializeNote(plan.digest));
+  if (plan.archivedPaths.length > 0) {
+    await git.rm(plan.archivedPaths);
+  }
+  await git.add([digestPath]);
 }
 
 function digestTags(fold: readonly Note[]): readonly string[] {

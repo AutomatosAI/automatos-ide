@@ -8,7 +8,10 @@ import {
   buildDigest,
   planConsolidation,
   planConsolidationFor,
+  applyConsolidation,
 } from './consolidate';
+import { GitOps } from '../../git/gitOps';
+import { FakeGitRunner, argStartsWith } from '../../test/fakeGit';
 
 function note(at: string, over: Partial<Note> = {}): Note {
   return { agent: 'agent-1', at, tags: [], text: `note ${at}`, ...over };
@@ -127,5 +130,25 @@ describe('planConsolidationFor', () => {
       await appendNote(store, n);
     }
     expect(await planConsolidationFor(store, 'a', ctx, 5)).toBeNull();
+  });
+});
+
+describe('applyConsolidation', () => {
+  const ctx = { now: '2026-06-30T00:00:00Z' };
+
+  it('writes the digest, git rm’s the originals, and stages the digest', async () => {
+    const store = new FakeFileStore();
+    for (const n of days(7, 'a')) {
+      await appendNote(store, n);
+    }
+    const plan = await planConsolidationFor(store, 'a', ctx, 5);
+    const runner = new FakeGitRunner();
+    await applyConsolidation(new GitOps(runner, '/repo'), store, plan!);
+
+    const digestPath = notePath('a', ctx.now);
+    expect(store.has(digestPath)).toBe(true);
+    expect(parseNote(await store.read(digestPath)).tags).toContain(DIGEST_TAG);
+    expect(runner.ran(argStartsWith('rm', '--', ...plan!.archivedPaths))).toBe(true);
+    expect(runner.ran(argStartsWith('add', '--', digestPath))).toBe(true);
   });
 });

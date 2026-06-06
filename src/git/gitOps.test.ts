@@ -46,6 +46,12 @@ describe('GitOps mutations', () => {
     expect(call?.args).toEqual(['commit', '-m', 'claim PRD-0007']);
   });
 
+  it('rm removes the given paths after a `--` guard', async () => {
+    const runner = new FakeGitRunner();
+    await new GitOps(runner, CWD).rm(['memory/a/old.md', 'memory/a/older.md']);
+    expect(runner.ran(argStartsWith('rm', '--', 'memory/a/old.md', 'memory/a/older.md'))).toBe(true);
+  });
+
   it('resetHardToUpstream runs reset --hard @{u}', async () => {
     const runner = new FakeGitRunner();
     await new GitOps(runner, CWD).resetHardToUpstream();
