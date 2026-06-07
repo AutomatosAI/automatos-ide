@@ -5,17 +5,22 @@ import { GitRunner, GitResult } from './runner';
  *
  * The one subtlety is {@link push}: a non-fast-forward rejection is NOT an error to
  * throw — it is the losing side of the claim CAS (33 §2), so it returns a structured
- * {@link PushResult} the loser contract can act on. Everything else throws on failure.
+ * {@link PushResult} the loser contract can act on. A repo with no remote configured is
+ * likewise not an error: the commit is already local, so push reports `localOnly` and the
+ * board write stands, just unshared until a remote is added. Everything else throws.
  */
 
 export interface PushResult {
   readonly ok: boolean;
   /** true when the push lost a race (someone else pushed first) — the CAS signal. */
   readonly rejected: boolean;
+  /** true when the commit landed locally but the repo has no remote to broadcast to. */
+  readonly localOnly: boolean;
   readonly stderr: string;
 }
 
 const REJECTION_MARKERS = ['rejected', 'non-fast-forward', 'fetch first', 'failed to push'];
+const NO_REMOTE_MARKERS = ['no configured push destination'];
 
 export class GitOps {
   constructor(
@@ -46,9 +51,15 @@ export class GitOps {
   async push(): Promise<PushResult> {
     const result = await this.runner.run(['push'], this.cwd);
     if (result.code === 0) {
-      return { ok: true, rejected: false, stderr: result.stderr };
+      return { ok: true, rejected: false, localOnly: false, stderr: result.stderr };
     }
-    return { ok: false, rejected: isRejection(result), stderr: result.stderr };
+    if (isNoRemote(result)) {
+      // A control repo with no remote (fresh `git init`, solo/offline use) has nowhere to
+      // broadcast — but the commit already landed locally, so this is a local-only success,
+      // not a failure. Board writes proceed; they're simply unshared until a remote exists.
+      return { ok: true, rejected: false, localOnly: true, stderr: result.stderr };
+    }
+    return { ok: false, rejected: isRejection(result), localOnly: false, stderr: result.stderr };
   }
 
   /** The loser contract's first move: discard the lost commit, match upstream (33 §3). */
@@ -95,4 +106,9 @@ export class GitOps {
 function isRejection(result: GitResult): boolean {
   const haystack = `${result.stdout}\n${result.stderr}`.toLowerCase();
   return REJECTION_MARKERS.some((marker) => haystack.includes(marker));
+}
+
+function isNoRemote(result: GitResult): boolean {
+  const haystack = `${result.stdout}\n${result.stderr}`.toLowerCase();
+  return NO_REMOTE_MARKERS.some((marker) => haystack.includes(marker));
 }

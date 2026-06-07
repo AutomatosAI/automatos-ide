@@ -70,6 +70,8 @@ export async function newPrd(root: string, store: FileStore, git: GitOps): Promi
   const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(join(root, path)));
   await vscode.window.showTextDocument(doc);
   vscode.window.showInformationMessage(
-    `Created ${id} in the inbox. Flesh out the PRD, then drag it to In Progress to launch a worker.`,
+    push.localOnly
+      ? `Created ${id} locally — the control repo has no remote yet, so it isn't shared with the team. Add a remote to broadcast it.`
+      : `Created ${id} in the inbox. Flesh out the PRD, then drag it to In Progress to launch a worker.`,
   );
 }
