@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Card } from '../cards/card';
-import { Config, DEFAULT_CONFIG, ProjectRepo } from '../config/config';
+import { Config, DEFAULT_CONFIG } from '../config/config';
+import { deriveProjectKey } from '../config/projectKey';
 import { projectRepoPathFor } from './projectRepo';
 
 function card(project: string, over: Partial<Card> = {}): Card {
@@ -21,8 +22,11 @@ function card(project: string, over: Partial<Card> = {}): Card {
   };
 }
 
-function config(projectRepos: readonly ProjectRepo[]): Config {
-  return { ...DEFAULT_CONFIG, projectRepos };
+function config(repos: readonly { name: string; path: string }[]): Config {
+  return {
+    ...DEFAULT_CONFIG,
+    projectRepos: repos.map((r) => ({ ...r, key: deriveProjectKey(r.name) })),
+  };
 }
 
 describe('projectRepoPathFor', () => {

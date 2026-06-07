@@ -1,4 +1,5 @@
 import YAML from 'yaml';
+import { normalizeProjectKey } from './projectKey';
 
 /**
  * `config.yml` — the control repo's single configuration file.
@@ -14,6 +15,8 @@ export type Engine = (typeof ENGINES)[number];
 export interface ProjectRepo {
   readonly name: string;
   readonly path: string;
+  /** short key for this project's PRD ids (e.g. `AUTO` → `AUTO-0145`); derived if omitted. */
+  readonly key: string;
 }
 
 export interface AgentConfig {
@@ -96,7 +99,7 @@ function parseRepos(value: unknown): readonly ProjectRepo[] {
     if (typeof path !== 'string' || path.length === 0) {
       throw new Error(`config.yml: project_repos[${index}].path is required`);
     }
-    return { name, path };
+    return { name, path, key: normalizeProjectKey(repo.key, name) };
   });
 }
 

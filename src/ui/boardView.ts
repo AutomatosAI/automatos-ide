@@ -45,7 +45,9 @@ export function renderBoardHtml(board: Board, options: BoardViewOptions = {}): s
   .column h2 { font-size: 12px; text-transform: uppercase; opacity: 0.7; margin: 0 0 8px; }
   .count { opacity: 0.5; font-weight: normal; }
   .card { background: var(--vscode-editor-background); border: 1px solid var(--vscode-widget-border); border-radius: 4px; padding: 6px 8px; margin-bottom: 6px; cursor: grab; }
+  .card .cardhead { display: flex; align-items: baseline; justify-content: space-between; gap: 6px; }
   .card .id { font-size: 11px; opacity: 0.6; }
+  .card .project { font-size: 10px; padding: 0 6px; border-radius: 8px; background: var(--vscode-badge-background); color: var(--vscode-badge-foreground); white-space: nowrap; }
   .card .title { font-weight: 600; }
   .card .meta { font-size: 11px; opacity: 0.7; margin-top: 2px; }
   .card .launch { margin-top: 6px; font-size: 11px; padding: 2px 8px; border: none; border-radius: 3px; cursor: pointer; background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
@@ -135,11 +137,14 @@ function renderCard(card: Card): string {
     .filter((part): part is string => Boolean(part))
     .map(escapeHtml)
     .join(' · ');
+  const project = card.project
+    ? `<span class="project">${escapeHtml(card.project)}</span>`
+    : '';
   const launch = LAUNCHABLE.has(card.status)
     ? `\n    <button class="launch" data-id="${escapeHtml(card.id)}">▶ ${card.status === 'ready' ? 'Launch' : 'Resume'}</button>`
     : '';
   return `<div class="card" draggable="true" data-id="${escapeHtml(card.id)}" data-status="${card.status}">
-    <div class="id">${escapeHtml(card.id)}</div>
+    <div class="cardhead"><span class="id">${escapeHtml(card.id)}</span>${project}</div>
     <div class="title">${escapeHtml(card.title)}</div>
     <div class="meta">${meta}</div>${launch}
   </div>`;

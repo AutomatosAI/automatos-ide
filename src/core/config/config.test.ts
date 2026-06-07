@@ -24,7 +24,19 @@ describe('parseConfig project_repos', () => {
     path: ../web-app
 `);
     expect(cfg.projectRepos).toHaveLength(2);
-    expect(cfg.projectRepos[1]).toEqual({ name: 'web-app', path: '../web-app' });
+    expect(cfg.projectRepos[1]).toEqual({ name: 'web-app', path: '../web-app', key: 'WEBAPP' });
+  });
+
+  it('honours an explicit key and derives one when it is omitted', () => {
+    const cfg = parseConfig(`project_repos:
+  - name: automatos-ai
+    path: ../automatos-ai
+    key: AUTO
+  - name: dr-green
+    path: ../dr-green
+`);
+    expect(cfg.projectRepos[0].key).toBe('AUTO');
+    expect(cfg.projectRepos[1].key).toBe('DRGREEN');
   });
 
   it('throws when a repo is missing its path', () => {

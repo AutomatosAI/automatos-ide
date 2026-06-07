@@ -85,7 +85,7 @@ export function activate(context: vscode.ExtensionContext): void {
       }),
     ),
     vscode.commands.registerCommand('automatos.newPrd', () =>
-      withHost((host) => newPrd(host.root, host.store, host.git)),
+      withHost(async (host) => newPrd(host.root, host.store, host.git, await loadConfig(host.store))),
     ),
   );
 }

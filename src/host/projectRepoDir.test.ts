@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Card } from '../core/cards/card';
-import { Config, DEFAULT_CONFIG, ProjectRepo } from '../core/config/config';
+import { Config, DEFAULT_CONFIG } from '../core/config/config';
+import { deriveProjectKey } from '../core/config/projectKey';
 import { projectRepoDir } from './projectRepoDir';
 
 const HOME = '/Users/dev';
@@ -23,8 +24,11 @@ function card(project: string): Card {
   };
 }
 
-function config(projectRepos: readonly ProjectRepo[]): Config {
-  return { ...DEFAULT_CONFIG, projectRepos };
+function config(repos: readonly { name: string; path: string }[]): Config {
+  return {
+    ...DEFAULT_CONFIG,
+    projectRepos: repos.map((r) => ({ ...r, key: deriveProjectKey(r.name) })),
+  };
 }
 
 describe('projectRepoDir', () => {

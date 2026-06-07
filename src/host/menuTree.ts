@@ -73,7 +73,7 @@ export class MenuTreeProvider implements vscode.TreeDataProvider<MenuNode> {
     }
     const card = node.card;
     const item = new vscode.TreeItem(`${card.id}  ${card.title}`, vscode.TreeItemCollapsibleState.None);
-    item.description = [card.owner ? `@${card.owner}` : null, card.engine, `P${card.priority}`]
+    item.description = [card.project || null, card.owner ? `@${card.owner}` : null, card.engine, `P${card.priority}`]
       .filter((part): part is string => Boolean(part))
       .join(' · ');
     item.tooltip = card.title;

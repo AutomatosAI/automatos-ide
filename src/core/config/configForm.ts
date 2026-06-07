@@ -7,6 +7,7 @@ import {
   ProjectRepo,
   isEngine,
 } from './config';
+import { deriveProjectKey, isProjectKey, normalizeProjectKey } from './projectKey';
 
 /**
  * Form-side companion to {@link config.ts} for the M0 settings panel.
@@ -27,7 +28,7 @@ export interface ConfigFormDraft {
   readonly requireCi: boolean;
   /** Empty string means "no cadence" (consolidate_every_cards: null). */
   readonly consolidateEveryCards: string;
-  /** Newline-separated `name=path` lines. */
+  /** Newline-separated `name=path` lines, each with an optional trailing `=KEY`. */
   readonly projectRepos: string;
   /** Newline-separated public age keys. */
   readonly sopsRecipients: string;
@@ -55,7 +56,7 @@ export function configToDraft(config: Config): ConfigFormDraft {
       config.memory.consolidateEveryCards === null
         ? ''
         : String(config.memory.consolidateEveryCards),
-    projectRepos: config.projectRepos.map((r) => `${r.name}=${r.path}`).join('\n'),
+    projectRepos: config.projectRepos.map(projectRepoLine).join('\n'),
     sopsRecipients: config.secrets.sopsRecipients.join('\n'),
   };
 }
@@ -131,7 +132,7 @@ export function validateDraft(draft: ConfigFormDraft): ValidationResult {
 
 export function serializeConfig(config: Config): string {
   const root = {
-    project_repos: config.projectRepos.map((r) => ({ name: r.name, path: r.path })),
+    project_repos: config.projectRepos.map(projectRepoYaml),
     agents: {
       max_workers: config.agents.maxWorkers,
       default_engine: config.agents.defaultEngine,
@@ -179,6 +180,19 @@ function parseLines(raw: string): readonly string[] {
     .filter((line) => line.length > 0);
 }
 
+/** A `name=path` line, suffixed with `=KEY` only when the key isn't the derived default. */
+function projectRepoLine(repo: ProjectRepo): string {
+  const base = `${repo.name}=${repo.path}`;
+  return repo.key === deriveProjectKey(repo.name) ? base : `${base}=${repo.key}`;
+}
+
+/** The YAML object for a repo — omits `key` when it's just the derived default, to stay tidy. */
+function projectRepoYaml(repo: ProjectRepo): { name: string; path: string; key?: string } {
+  return repo.key === deriveProjectKey(repo.name)
+    ? { name: repo.name, path: repo.path }
+    : { name: repo.name, path: repo.path, key: repo.key };
+}
+
 function parseProjectRepos(raw: string): {
   readonly repos?: readonly ProjectRepo[];
   readonly error?: string;
@@ -190,8 +204,22 @@ function parseProjectRepos(raw: string): {
       return { error: `line ${index + 1}: expected name=path` };
     }
     const name = line.slice(0, eq).trim();
-    const path = line.slice(eq + 1).trim();
-    repos.push({ name, path });
+    let path = line.slice(eq + 1).trim();
+    // An optional trailing `=KEY` sets the project's PRD key; a path segment that isn't
+    // key-shaped (e.g. has a slash) is left as part of the path.
+    let rawKey: string | undefined;
+    const lastEq = path.lastIndexOf('=');
+    if (lastEq > 0) {
+      const tail = path.slice(lastEq + 1).trim();
+      if (isProjectKey(tail)) {
+        rawKey = tail;
+        path = path.slice(0, lastEq).trim();
+      }
+    }
+    if (path.length === 0) {
+      return { error: `line ${index + 1}: expected name=path` };
+    }
+    repos.push({ name, path, key: normalizeProjectKey(rawKey, name) });
   }
   return { repos };
 }

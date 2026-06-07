@@ -3,25 +3,11 @@ import { Card } from './card';
 /**
  * Mint a brand-new inbox card — the pure heart of the "New PRD" action.
  *
- * No I/O: {@link nextPrdId} picks the next free `PRD-NNNN` from the ids already on the
- * board, and {@link newReadyCard} returns an unclaimed `ready` card carrying a PRD scaffold
- * for a human (or a worker) to flesh out. The host writes it to `prds/inbox/` and pushes —
- * the same git-native path every other board change takes.
+ * No I/O: the caller picks the id (see {@link ../cards/prdId.nextPrdId}, scoped to the
+ * project's key) and {@link newReadyCard} returns an unclaimed `ready` card carrying a PRD
+ * scaffold for a human (or a worker) to flesh out. The host writes it to `prds/inbox/` and
+ * pushes — the same git-native path every other board change takes.
  */
-
-const PRD_ID_RE = /^PRD-(\d+)$/;
-
-/** The next sequential `PRD-NNNN` id (zero-padded to four) given the ids already in use. */
-export function nextPrdId(existingIds: readonly string[]): string {
-  let max = 0;
-  for (const id of existingIds) {
-    const match = PRD_ID_RE.exec(id);
-    if (match) {
-      max = Math.max(max, Number(match[1]));
-    }
-  }
-  return `PRD-${String(max + 1).padStart(4, '0')}`;
-}
 
 export interface NewCardInput {
   readonly id: string;
