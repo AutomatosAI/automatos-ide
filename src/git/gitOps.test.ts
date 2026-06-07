@@ -8,7 +8,18 @@ describe('GitOps.push — the CAS signal', () => {
   it('reports success on exit 0', async () => {
     const runner = new FakeGitRunner();
     const result = await new GitOps(runner, CWD).push();
-    expect(result).toEqual({ ok: true, rejected: false, stderr: '' });
+    expect(result).toEqual({ ok: true, rejected: false, localOnly: false, stderr: '' });
+  });
+
+  it('treats a repo with no remote as a local-only success, not a failure', async () => {
+    const runner = new FakeGitRunner().on(argStartsWith('push'), {
+      code: 128,
+      stderr: 'fatal: No configured push destination.\nEither specify the URL from the command-line',
+    });
+    const result = await new GitOps(runner, CWD).push();
+    expect(result.ok).toBe(true);
+    expect(result.rejected).toBe(false);
+    expect(result.localOnly).toBe(true);
   });
 
   it('classifies a non-fast-forward as a lost race (rejected)', async () => {
@@ -29,6 +40,7 @@ describe('GitOps.push — the CAS signal', () => {
     const result = await new GitOps(runner, CWD).push();
     expect(result.ok).toBe(false);
     expect(result.rejected).toBe(false);
+    expect(result.localOnly).toBe(false);
   });
 });
 
@@ -68,6 +80,13 @@ describe('GitOps mutations', () => {
 });
 
 describe('GitOps reads + errors', () => {
+  it('currentBranch returns the trimmed rev-parse output', async () => {
+    const runner = new FakeGitRunner().on(argStartsWith('rev-parse', '--abbrev-ref', 'HEAD'), {
+      stdout: 'master\n',
+    });
+    expect(await new GitOps(runner, CWD).currentBranch()).toBe('master');
+  });
+
   it('listFiles splits ls-files output into trimmed names', async () => {
     const runner = new FakeGitRunner().on(argHas('ls-files'), {
       stdout: 'prds/inbox/a.md\nprds/inbox/b.md\n\n',

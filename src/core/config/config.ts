@@ -1,4 +1,5 @@
 import YAML from 'yaml';
+import { normalizeProjectKey } from './projectKey';
 
 /**
  * `config.yml` — the control repo's single configuration file.
@@ -14,6 +15,8 @@ export type Engine = (typeof ENGINES)[number];
 export interface ProjectRepo {
   readonly name: string;
   readonly path: string;
+  /** short key for this project's PRD ids (e.g. `AUTO` → `AUTO-0145`); derived if omitted. */
+  readonly key: string;
 }
 
 export interface AgentConfig {
@@ -40,6 +43,18 @@ export interface SecretsConfig {
   readonly sopsRecipients: readonly string[];
 }
 
+/**
+ * The Automatos coordination backend the AUTO chat and (later) the board talk to.
+ *
+ * Team-wide, so it lives in `config.yml`; the per-user publishable key (`ak_pub_*`) does NOT —
+ * that goes in the OS keychain via the host's SecretStore, never in git.
+ */
+export interface AutomatosConfig {
+  readonly baseUrl: string;
+  /** AUTO agent's public id; null falls back to the workspace's default agent. */
+  readonly agentId: string | null;
+}
+
 export interface Config {
   readonly projectRepos: readonly ProjectRepo[];
   readonly agents: AgentConfig;
@@ -47,6 +62,7 @@ export interface Config {
   readonly verification: VerificationConfig;
   readonly memory: MemoryConfig;
   readonly secrets: SecretsConfig;
+  readonly automatos: AutomatosConfig;
 }
 
 export const DEFAULT_CONFIG: Config = {
@@ -56,6 +72,7 @@ export const DEFAULT_CONFIG: Config = {
   verification: { requireValidator: true, requireCi: true },
   memory: { consolidateEveryCards: null, consolidateCron: null },
   secrets: { sopsRecipients: [] },
+  automatos: { baseUrl: 'https://api.automatos.app', agentId: null },
 };
 
 export function parseConfig(raw: string): Config {
@@ -72,6 +89,7 @@ export function parseConfig(raw: string): Config {
     verification: parseVerification(asRecord(root.verification)),
     memory: parseMemory(asRecord(root.memory)),
     secrets: { sopsRecipients: parseStringArray(asRecord(root.secrets).sops_recipients) },
+    automatos: parseAutomatos(asRecord(root.automatos)),
   };
 }
 
@@ -96,7 +114,7 @@ function parseRepos(value: unknown): readonly ProjectRepo[] {
     if (typeof path !== 'string' || path.length === 0) {
       throw new Error(`config.yml: project_repos[${index}].path is required`);
     }
-    return { name, path };
+    return { name, path, key: normalizeProjectKey(repo.key, name) };
   });
 }
 
@@ -138,6 +156,13 @@ function parseMemory(m: Record<string, unknown>): MemoryConfig {
     consolidateEveryCards: typeof everyCards === 'number' ? everyCards : null,
     consolidateCron: typeof m.consolidate_cron === 'string' ? m.consolidate_cron : null,
   };
+}
+
+function parseAutomatos(a: Record<string, unknown>): AutomatosConfig {
+  const rawUrl = typeof a.base_url === 'string' ? a.base_url.trim() : '';
+  const baseUrl = rawUrl.length > 0 ? rawUrl.replace(/\/+$/, '') : DEFAULT_CONFIG.automatos.baseUrl;
+  const agentId = typeof a.agent_id === 'string' && a.agent_id.length > 0 ? a.agent_id : null;
+  return { baseUrl, agentId };
 }
 
 function asRecord(value: unknown): Record<string, unknown> {

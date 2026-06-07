@@ -25,11 +25,22 @@ describe('configToDraft', () => {
     const draft = configToDraft({
       ...DEFAULT_CONFIG,
       projectRepos: [
-        { name: 'api', path: '../api' },
-        { name: 'web', path: '../web' },
+        { name: 'api', path: '../api', key: 'API' },
+        { name: 'web', path: '../web', key: 'WEB' },
       ],
     });
     expect(draft.projectRepos).toBe('api=../api\nweb=../web');
+  });
+
+  it('appends =KEY only when the key is not the derived default', () => {
+    const draft = configToDraft({
+      ...DEFAULT_CONFIG,
+      projectRepos: [
+        { name: 'automatos-ai', path: '../automatos-ai', key: 'AUTO' },
+        { name: 'dr-green', path: '../dr-green', key: 'DRGREEN' },
+      ],
+    });
+    expect(draft.projectRepos).toBe('automatos-ai=../automatos-ai=AUTO\ndr-green=../dr-green');
   });
 
   it('flattens sops recipients into newline-separated lines', () => {
@@ -137,9 +148,32 @@ describe('validateDraft', () => {
     const result = validateDraft(draft);
     expect(result.ok).toBe(true);
     expect(result.config?.projectRepos).toEqual([
-      { name: 'api', path: '../api' },
-      { name: 'web', path: '../web' },
+      { name: 'api', path: '../api', key: 'API' },
+      { name: 'web', path: '../web', key: 'WEB' },
     ]);
+  });
+
+  it('reads an explicit trailing =KEY and derives one otherwise', () => {
+    const draft = {
+      ...configToDraft(DEFAULT_CONFIG),
+      projectRepos: 'automatos-ai=../automatos-ai=AUTO\ndr-green=../dr-green',
+    };
+    const result = validateDraft(draft);
+    expect(result.ok).toBe(true);
+    expect(result.config?.projectRepos).toEqual([
+      { name: 'automatos-ai', path: '../automatos-ai', key: 'AUTO' },
+      { name: 'dr-green', path: '../dr-green', key: 'DRGREEN' },
+    ]);
+  });
+
+  it('keeps a path that contains = when its tail is not key-shaped', () => {
+    const draft = {
+      ...configToDraft(DEFAULT_CONFIG),
+      projectRepos: 'odd=../a=b/c',
+    };
+    const result = validateDraft(draft);
+    expect(result.ok).toBe(true);
+    expect(result.config?.projectRepos).toEqual([{ name: 'odd', path: '../a=b/c', key: 'ODD' }]);
   });
 
   it('rejects a project_repos line that lacks an = separator', () => {
@@ -161,6 +195,24 @@ describe('validateDraft', () => {
     expect(result.config?.secrets.sopsRecipients).toEqual(['age1abc', 'age1def']);
   });
 
+  it('preserves the previous automatos block, which the form does not manage', () => {
+    const previous = {
+      ...DEFAULT_CONFIG,
+      automatos: { baseUrl: 'https://auto.example.com', agentId: 'agent-9' },
+    };
+    const result = validateDraft(configToDraft(previous), previous);
+    expect(result.ok).toBe(true);
+    expect(result.config?.automatos).toEqual({
+      baseUrl: 'https://auto.example.com',
+      agentId: 'agent-9',
+    });
+  });
+
+  it('defaults the automatos block when no previous config is supplied', () => {
+    const result = validateDraft(configToDraft(DEFAULT_CONFIG));
+    expect(result.config?.automatos).toEqual(DEFAULT_CONFIG.automatos);
+  });
+
   it('collects every field error in a single pass', () => {
     const draft = {
       ...configToDraft(DEFAULT_CONFIG),
@@ -180,7 +232,7 @@ describe('serializeConfig', () => {
   it('round-trips through parseConfig', () => {
     const cfg = {
       ...DEFAULT_CONFIG,
-      projectRepos: [{ name: 'api', path: '../api' }],
+      projectRepos: [{ name: 'api', path: '../api', key: 'API' }],
       agents: { maxWorkers: 2, defaultEngine: 'codex' as const },
       sync: { pullIntervalSeconds: 3, heartbeatIntervalSeconds: 8 },
       verification: { requireValidator: false, requireCi: true },
@@ -188,6 +240,26 @@ describe('serializeConfig', () => {
       secrets: { sopsRecipients: ['age1abc'] },
     };
     const yaml = serializeConfig(cfg);
+    expect(parseConfig(yaml)).toEqual(cfg);
+  });
+
+  it('round-trips a custom automatos block through parseConfig', () => {
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      automatos: { baseUrl: 'https://auto.example.com', agentId: 'agent-9' },
+    };
+    const yaml = serializeConfig(cfg);
+    expect(yaml).toMatch(/base_url: https:\/\/auto\.example\.com/);
+    expect(parseConfig(yaml)).toEqual(cfg);
+  });
+
+  it('round-trips a custom project key through parseConfig', () => {
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      projectRepos: [{ name: 'automatos-ai', path: '../automatos-ai', key: 'AUTO' }],
+    };
+    const yaml = serializeConfig(cfg);
+    expect(yaml).toMatch(/key: AUTO/);
     expect(parseConfig(yaml)).toEqual(cfg);
   });
 

@@ -39,6 +39,19 @@ describe('renderBoardHtml', () => {
     expect(html).toContain('@alice · claude · P2');
   });
 
+  it('badges a card with its project name', () => {
+    const board = buildBoard([card('AUTO-0145', 'ready', { project: 'automatos-ai' })]);
+    const html = renderBoardHtml(board);
+    expect(html).toContain('class="project"');
+    expect(html).toContain('automatos-ai');
+  });
+
+  it('omits the project badge for a control-repo card', () => {
+    const board = buildBoard([card('PRD-0007', 'ready', { project: '' })]);
+    const html = renderBoardHtml(board);
+    expect(html).not.toContain('class="project"');
+  });
+
   it('escapes untrusted card titles', () => {
     const board = buildBoard([card('PRD-2', 'ready', { title: '<img src=x onerror=alert(1)>' })]);
     const html = renderBoardHtml(board);

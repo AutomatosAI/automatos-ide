@@ -6,10 +6,19 @@ import { CONFIG_FILENAME, controlRepoRoot } from './host/workspace';
 import { currentHuman } from './host/githubAuth';
 import { BoardPanel } from './host/boardPanel';
 import { ChatPanel } from './host/chatPanel';
+import { AutoChatPanel } from './host/autoChatPanel';
+import { createAutoClient } from './host/autoClient';
+import { SecretStore } from './host/secretStore';
+import { setAutomatosKey, WORKSPACE_KEY_NAME } from './host/setAutomatosKey';
 import { SettingsPanel } from './host/settingsPanel';
 import { consolidateMemory } from './host/memoryCommand';
 import { launchWorkerForCard } from './host/launchWorker';
+import { newPrd } from './host/newPrdCommand';
+import { selectControlRepo } from './host/selectControlRepo';
 import { autoStatus, autoDecompose } from './host/autoCommand';
+import { syncReview } from './host/syncReview';
+import { reclaimStaleWorkers } from './host/reclaimWorkers';
+import { execCommandRunner } from './proc/commandRunner';
 import { MenuTreeProvider } from './host/menuTree';
 import { Config, DEFAULT_CONFIG, parseConfig } from './core/config/config';
 import { nodeEngineProbe } from './proc/engineProbe';
@@ -20,19 +29,29 @@ import { Card } from './core/cards/card';
 import { PRDS_ROOT } from './core/board/layout';
 
 /**
- * Extension entry point. Activation is gated on `workspaceContains` the control repo's
- * `config.yml` (see package.json) so the cockpit only wakes inside a control repo.
+ * Extension entry point. The Activity Bar menu is contributed statically, so the Automatos
+ * icon is present in EVERY window; clicking it activates us. The control repo is resolved
+ * from the `automatos.controlRepoPath` setting first (so you can drive one board while you
+ * edit any other repo), then by auto-detecting a `config.yml` in the open workspace — and
+ * the menu rebuilds when that setting changes.
  *
  * Each command resolves a fresh {@link Host} (root + FileStore + GitOps over the real
- * binaries) and hands it to the relevant subsystem. The Activity Bar menu is the always-
- * present home: board, chat, memory, AUTO, and the launchable queue, reachable while you
- * edit any repo in a multi-root workspace. All durable state lives in git, never in
- * extension memory, so `deactivate` is a no-op by design.
+ * binaries) and hands it to the relevant subsystem. All durable state lives in git, never
+ * in extension memory, so `deactivate` is a no-op by design.
  */
 export function activate(context: vscode.ExtensionContext): void {
-  void registerMenu(context);
+  void buildMenu();
+
+  const secrets = new SecretStore(context.secrets);
 
   context.subscriptions.push(
+    { dispose: () => disposeMenu() },
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('automatos.controlRepoPath')) {
+        void buildMenu();
+      }
+    }),
+    vscode.commands.registerCommand('automatos.selectControlRepo', () => selectControlRepo()),
     vscode.commands.registerCommand('automatos.openBoard', () =>
       withHost((host) => {
         BoardPanel.show(context, host);
@@ -48,14 +67,24 @@ export function activate(context: vscode.ExtensionContext): void {
         ChatPanel.show(context, { ...host, me: human.handle });
       }),
     ),
+    vscode.commands.registerCommand('automatos.openAutoChat', () =>
+      withHost((host) => openAutoChatFlow(context, host, secrets)),
+    ),
+    vscode.commands.registerCommand('automatos.setAutomatosKey', () => setAutomatosKey(secrets)),
     vscode.commands.registerCommand('automatos.consolidateMemory', () =>
       withHost((host) => consolidateMemory(host.store, host.git)),
     ),
     vscode.commands.registerCommand('automatos.autoStatus', () =>
-      withHost((host) => autoStatus(host.store)),
+      withHost((host) => autoStatusFlow(host)),
     ),
     vscode.commands.registerCommand('automatos.autoDecompose', () =>
       withHost((host) => decomposeFlow(host)),
+    ),
+    vscode.commands.registerCommand('automatos.syncReview', () =>
+      withHost((host) => syncReviewFlow(host)),
+    ),
+    vscode.commands.registerCommand('automatos.reclaimStale', () =>
+      withHost((host) => reclaimFlow(host)),
     ),
     vscode.commands.registerCommand('automatos.launchWorker', (arg: unknown) =>
       withHost((host) => launchFlow(host, arg)),
@@ -64,6 +93,9 @@ export function activate(context: vscode.ExtensionContext): void {
       withHost((host) => {
         SettingsPanel.show(context, { root: host.root, store: host.store });
       }),
+    ),
+    vscode.commands.registerCommand('automatos.newPrd', () =>
+      withHost(async (host) => newPrd(host.root, host.store, host.git, await loadConfig(host.store))),
     ),
   );
 }
@@ -80,13 +112,21 @@ interface Host {
 
 /**
  * Resolve the control repo and run `fn` against it, surfacing any failure as a notification
- * instead of an unhandled rejection. Built per-invocation so a repo opened after activation
- * is always picked up fresh.
+ * instead of an unhandled rejection. Built per-invocation so a repo opened (or a path set)
+ * after activation is always picked up fresh. With no control repo, the error is actionable
+ * — it offers the folder picker rather than leaving the user stuck.
  */
 async function withHost(fn: (host: Host) => void | Promise<void>): Promise<void> {
   const root = await controlRepoRoot();
   if (!root) {
-    vscode.window.showErrorMessage('Automatos: no control repo (config.yml) found in the workspace.');
+    const pick = 'Select Control Repo';
+    const choice = await vscode.window.showErrorMessage(
+      'Automatos: no control repo found. Set one, or open a workspace that contains config.yml.',
+      pick,
+    );
+    if (choice === pick) {
+      await selectControlRepo();
+    }
     return;
   }
   const host: Host = { root, store: nodeFileStore(root), git: new GitOps(execGitRunner, root) };
@@ -97,21 +137,37 @@ async function withHost(fn: (host: Host) => void | Promise<void>): Promise<void>
   }
 }
 
-/** Build the Activity Bar menu over the control repo and keep it fresh on board changes. */
-async function registerMenu(context: vscode.ExtensionContext): Promise<void> {
+const menuDisposables: vscode.Disposable[] = [];
+
+/**
+ * Build (or rebuild) the Activity Bar menu over the current control repo. Safe to call
+ * repeatedly — it disposes the previous view/watcher first — so we re-run it whenever the
+ * `automatos.controlRepoPath` setting changes and the board should now point elsewhere.
+ * When no control repo is resolved yet, the provider still renders a bootstrap action so
+ * the sidebar is never a dead end.
+ */
+async function buildMenu(): Promise<void> {
+  disposeMenu();
   const root = await controlRepoRoot();
-  if (!root) {
-    return;
-  }
-  const provider = new MenuTreeProvider(root, nodeFileStore(root));
-  const view = vscode.window.createTreeView('automatosMenu', { treeDataProvider: provider });
-  const watcher = vscode.workspace.createFileSystemWatcher(
-    new vscode.RelativePattern(root, `${PRDS_ROOT}/**`),
+  const provider = new MenuTreeProvider(root, root ? nodeFileStore(root) : undefined);
+  menuDisposables.push(
+    vscode.window.createTreeView('automatosMenu', { treeDataProvider: provider }),
   );
-  watcher.onDidChange(() => provider.refresh());
-  watcher.onDidCreate(() => provider.refresh());
-  watcher.onDidDelete(() => provider.refresh());
-  context.subscriptions.push(view, watcher);
+  if (root) {
+    const watcher = vscode.workspace.createFileSystemWatcher(
+      new vscode.RelativePattern(root, `${PRDS_ROOT}/**`),
+    );
+    watcher.onDidChange(() => provider.refresh());
+    watcher.onDidCreate(() => provider.refresh());
+    watcher.onDidDelete(() => provider.refresh());
+    menuDisposables.push(watcher);
+  }
+}
+
+function disposeMenu(): void {
+  for (const d of menuDisposables.splice(0)) {
+    d.dispose();
+  }
 }
 
 /** Launch a worker on a card chosen by arg (tree node / board id) or via a QuickPick. */
@@ -133,12 +189,75 @@ async function launchFlow(host: Host, arg: unknown): Promise<void> {
   );
 }
 
+/**
+ * Open the AUTO chat panel, building the widget-plane client from `config.yml` (baseUrl/agentId)
+ * and the per-user publishable key in the keychain. With no key yet, offer to set one rather
+ * than failing — chat is the slice that does not need the board-auth unlock.
+ */
+async function openAutoChatFlow(
+  context: vscode.ExtensionContext,
+  host: Host,
+  secrets: SecretStore,
+): Promise<void> {
+  const apiKey = await secrets.get(WORKSPACE_KEY_NAME);
+  if (!apiKey) {
+    const setKey = 'Set Key';
+    const choice = await vscode.window.showWarningMessage(
+      'Add your Automatos workspace key (ak_pub_…) to chat with AUTO.',
+      setKey,
+    );
+    if (choice === setKey) {
+      await setAutomatosKey(secrets);
+    }
+    return;
+  }
+  const config = await loadConfig(host.store);
+  const human = await currentHuman();
+  const client = createAutoClient({
+    baseUrl: config.automatos.baseUrl,
+    apiKey,
+    agentId: config.automatos.agentId,
+  });
+  AutoChatPanel.show(context, { client, me: human?.handle ?? 'you' });
+}
+
 /** Pick a ready PRD and have AUTO split its `## Tasks` checklist into child cards. */
 async function decomposeFlow(host: Host): Promise<void> {
   const card = await pickCard(host.store, ['ready'], 'Select a PRD for AUTO to split into task cards');
   if (card) {
     await autoDecompose(host.store, host.git, card);
   }
+}
+
+/** Read-only AUTO overseer report, including worker liveness from heartbeats. */
+async function autoStatusFlow(host: Host): Promise<void> {
+  const config = await loadConfig(host.store);
+  await autoStatus(host.store, config.sync.heartbeatIntervalSeconds);
+}
+
+/** Surface stale workers (dead heartbeat) and reclaim the ones the human confirms. */
+async function reclaimFlow(host: Host): Promise<void> {
+  const config = await loadConfig(host.store);
+  await reclaimStaleWorkers({
+    root: host.root,
+    store: host.store,
+    git: host.git,
+    config,
+    now: () => new Date().toISOString(),
+  });
+}
+
+/** Advance review cards whose PR has merged to done, closing the board loop. */
+async function syncReviewFlow(host: Host): Promise<void> {
+  const config = await loadConfig(host.store);
+  await syncReview({
+    root: host.root,
+    store: host.store,
+    git: host.git,
+    config,
+    run: execCommandRunner,
+    now: () => new Date().toISOString(),
+  });
 }
 
 async function loadConfig(store: FileStore): Promise<Config> {

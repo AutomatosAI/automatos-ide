@@ -100,7 +100,7 @@ ${saved ? '<div class="status saved">Saved.</div>' : ''}
 
   <fieldset>
     <legend>Project repos</legend>
-    ${textareaField('projectRepos', 'One per line, in the form name=path', draft.projectRepos, errors, 'api=../api')}
+    ${textareaField('projectRepos', 'One per line: name=path, optionally =KEY for the PRD prefix', draft.projectRepos, errors, 'automatos-ai=../automatos-ai=AUTO')}
   </fieldset>
 
   <fieldset>

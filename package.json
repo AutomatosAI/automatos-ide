@@ -6,6 +6,7 @@
   "publisher": "automatos",
   "private": true,
   "license": "MIT",
+  "icon": "media/icon.png",
   "engines": {
     "vscode": "^1.90.0",
     "node": ">=18.17.0"
@@ -50,6 +51,18 @@
         "icon": "$(comment-discussion)"
       },
       {
+        "command": "automatos.openAutoChat",
+        "title": "Chat with AUTO",
+        "category": "Automatos",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "automatos.setAutomatosKey",
+        "title": "Set Automatos Workspace Key",
+        "category": "Automatos",
+        "icon": "$(key)"
+      },
+      {
         "command": "automatos.launchWorker",
         "title": "Launch Worker on PRD",
         "category": "Automatos",
@@ -68,6 +81,18 @@
         "icon": "$(list-tree)"
       },
       {
+        "command": "automatos.syncReview",
+        "title": "Sync Review (advance merged PRs to Done)",
+        "category": "Automatos",
+        "icon": "$(git-merge)"
+      },
+      {
+        "command": "automatos.reclaimStale",
+        "title": "Reclaim Stale Workers",
+        "category": "Automatos",
+        "icon": "$(debug-restart)"
+      },
+      {
         "command": "automatos.consolidateMemory",
         "title": "Consolidate Memory",
         "category": "Automatos",
@@ -78,10 +103,27 @@
         "title": "Open Settings",
         "category": "Automatos",
         "icon": "$(settings-gear)"
+      },
+      {
+        "command": "automatos.newPrd",
+        "title": "New PRD",
+        "category": "Automatos",
+        "icon": "$(add)"
+      },
+      {
+        "command": "automatos.selectControlRepo",
+        "title": "Select Control Repo Folder",
+        "category": "Automatos",
+        "icon": "$(root-folder)"
       }
     ],
     "menus": {
       "view/title": [
+        {
+          "command": "automatos.newPrd",
+          "when": "view == automatosMenu",
+          "group": "navigation"
+        },
         {
           "command": "automatos.openBoard",
           "when": "view == automatosMenu",
@@ -95,10 +137,23 @@
           "group": "inline"
         }
       ]
+    },
+    "configuration": {
+      "title": "Automatos",
+      "properties": {
+        "automatos.controlRepoPath": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "markdownDescription": "Absolute path to your Automatos **control repo** — the folder with `config.yml`, `prds/`, `chat/`, and `memory/`. When set, the cockpit drives that board from **any** window, so you can work in other repos without opening the control repo as your workspace. Leave blank to auto-detect a `config.yml` in the current workspace. `~` expands to your home directory. Tip: run **Automatos: Select Control Repo Folder** to set this with a picker."
+        }
+      }
     }
   },
   "scripts": {
     "build": "node esbuild.mjs",
+    "package": "vsce package --no-dependencies",
+    "package:install": "bash scripts/install-extension.sh",
     "watch": "node esbuild.mjs --watch",
     "seed": "node scripts/seed-dev-workspace.mjs",
     "typecheck": "tsc --noEmit",
@@ -111,11 +166,15 @@
     "@types/node": "^18.19.0",
     "@types/vscode": "^1.90.0",
     "@vitest/coverage-v8": "^1.6.0",
+    "@vscode/vsce": "^2.32.0",
     "esbuild": "^0.21.5",
     "typescript": "^5.4.5",
     "vitest": "^1.6.0"
   },
   "dependencies": {
     "yaml": "^2.9.0"
+  },
+  "overrides": {
+    "undici": "5.28.4"
   }
 }

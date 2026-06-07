@@ -45,6 +45,7 @@
 - ✅ `PRD-06-worker-runtime.md`
 - ✅ `PRD-07-memory-consolidation.md`
 - ✅ `PRD-08-team-chat.md`
+- 🚧 `PRD-09-automatos-integration.md` — Automatos team coordination backend (AUTO chat done; board blocked on auth unlock)
 
 ## Tier 5 — Delivery
 - ✅ `50-roadmap.md` — milestones (kernel → team → scale), sequencing & dependencies

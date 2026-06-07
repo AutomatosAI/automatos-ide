@@ -14,17 +14,27 @@ export interface ChatViewOptions {
   readonly nonce?: string;
   /** The reader's own handle, so their messages can be marked. */
   readonly me?: string;
+  /** Compose-box placeholder; defaults to the team-chat prompt. */
+  readonly placeholder?: string;
+  /** A muted "…is typing" row shown under the transcript while a reply is in flight. */
+  readonly pending?: string;
 }
+
+const DEFAULT_PLACEHOLDER = 'Message the team…';
 
 export function renderChatHtml(
   messages: readonly ChatMessage[],
   options: ChatViewOptions = {},
 ): string {
   const nonce = options.nonce ?? '';
+  const placeholder = escapeHtml(options.placeholder ?? DEFAULT_PLACEHOLDER);
+  const pending = options.pending
+    ? `<div class="msg pending"><div class="text">${escapeHtml(options.pending)}</div></div>`
+    : '';
   const body =
-    messages.length === 0
+    messages.length === 0 && !pending
       ? '<div class="empty">No messages yet.</div>'
-      : messages.map((m) => renderMessage(m, options.me)).join('\n');
+      : messages.map((m) => renderMessage(m, options.me)).join('\n') + pending;
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -38,6 +48,7 @@ export function renderChatHtml(
   .msg .who { font-size: 11px; opacity: 0.6; }
   .msg .text { white-space: pre-wrap; }
   .empty { opacity: 0.4; font-style: italic; padding: 8px; }
+  .msg.pending .text { opacity: 0.5; font-style: italic; }
   form { display: flex; gap: 6px; padding: 8px; border-top: 1px solid var(--vscode-widget-border); }
   textarea { flex: 1; resize: none; background: var(--vscode-input-background); color: var(--vscode-input-foreground); border: 1px solid var(--vscode-input-border); border-radius: 4px; }
   button { background: var(--vscode-button-background); color: var(--vscode-button-foreground); border: none; border-radius: 4px; padding: 4px 12px; cursor: pointer; }
@@ -48,7 +59,7 @@ export function renderChatHtml(
 ${body}
 </div>
 <form id="compose">
-  <textarea id="text" rows="2" placeholder="Message the team…"></textarea>
+  <textarea id="text" rows="2" placeholder="${placeholder}"></textarea>
   <button type="submit">Send</button>
 </form>
 <script nonce="${nonce}">

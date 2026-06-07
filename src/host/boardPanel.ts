@@ -101,6 +101,13 @@ export class BoardPanel {
     if (!card || !isCardStatus(to)) {
       return;
     }
+    // Dragging a ready card into In Progress IS a launch: claim it and spawn a worker,
+    // not a bare git move that would park it there with no agent behind it.
+    if (card.status === 'ready' && to === 'in-progress') {
+      await vscode.commands.executeCommand('automatos.launchWorker', id);
+      await this.refresh();
+      return;
+    }
     try {
       const result = await moveCard(this.deps.git, this.deps.store, card, to, {
         now: new Date().toISOString(),
@@ -126,6 +133,7 @@ export class BoardPanel {
 
 /** Toolbar buttons that simply fan out to an already-registered command. */
 const TOOLBAR_COMMANDS: Readonly<Record<string, string>> = {
+  newprd: 'automatos.newPrd',
   chat: 'automatos.openChat',
   auto: 'automatos.autoStatus',
   decompose: 'automatos.autoDecompose',
