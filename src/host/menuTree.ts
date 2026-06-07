@@ -28,6 +28,7 @@ const ACTIONS: readonly { label: string; commandId: string; icon: string }[] = [
   { label: 'New PRD', commandId: 'automatos.newPrd', icon: 'add' },
   { label: 'Open Board', commandId: 'automatos.openBoard', icon: 'layout' },
   { label: 'Team Chat', commandId: 'automatos.openChat', icon: 'comment-discussion' },
+  { label: 'Chat with AUTO', commandId: 'automatos.openAutoChat', icon: 'hubot' },
   { label: 'AUTO Status', commandId: 'automatos.autoStatus', icon: 'pulse' },
   { label: 'Split a PRD into tasks', commandId: 'automatos.autoDecompose', icon: 'list-tree' },
   { label: 'Sync Review (merged → Done)', commandId: 'automatos.syncReview', icon: 'git-merge' },

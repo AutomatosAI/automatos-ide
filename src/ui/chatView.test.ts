@@ -46,4 +46,20 @@ describe('renderChatHtml', () => {
     expect(html).toContain('<form id="compose">');
     expect(html).toContain('<script nonce="n0">');
   });
+
+  it('defaults the compose placeholder to the team prompt', () => {
+    expect(renderChatHtml([])).toContain('placeholder="Message the team…"');
+  });
+
+  it('uses a custom, escaped placeholder when given', () => {
+    const html = renderChatHtml([], { placeholder: 'Message "AUTO"…' });
+    expect(html).toContain('placeholder="Message &quot;AUTO&quot;…"');
+  });
+
+  it('renders an escaped pending row instead of the empty state', () => {
+    const html = renderChatHtml([], { pending: 'AUTO is thinking…' });
+    expect(html).toContain('msg pending');
+    expect(html).toContain('AUTO is thinking…');
+    expect(html).not.toContain('No messages yet.');
+  });
 });

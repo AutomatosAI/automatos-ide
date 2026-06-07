@@ -51,6 +51,18 @@
         "icon": "$(comment-discussion)"
       },
       {
+        "command": "automatos.openAutoChat",
+        "title": "Chat with AUTO",
+        "category": "Automatos",
+        "icon": "$(hubot)"
+      },
+      {
+        "command": "automatos.setAutomatosKey",
+        "title": "Set Automatos Workspace Key",
+        "category": "Automatos",
+        "icon": "$(key)"
+      },
+      {
         "command": "automatos.launchWorker",
         "title": "Launch Worker on PRD",
         "category": "Automatos",

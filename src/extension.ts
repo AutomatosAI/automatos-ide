@@ -6,6 +6,10 @@ import { CONFIG_FILENAME, controlRepoRoot } from './host/workspace';
 import { currentHuman } from './host/githubAuth';
 import { BoardPanel } from './host/boardPanel';
 import { ChatPanel } from './host/chatPanel';
+import { AutoChatPanel } from './host/autoChatPanel';
+import { createAutoClient } from './host/autoClient';
+import { SecretStore } from './host/secretStore';
+import { setAutomatosKey, WORKSPACE_KEY_NAME } from './host/setAutomatosKey';
 import { SettingsPanel } from './host/settingsPanel';
 import { consolidateMemory } from './host/memoryCommand';
 import { launchWorkerForCard } from './host/launchWorker';
@@ -38,6 +42,8 @@ import { PRDS_ROOT } from './core/board/layout';
 export function activate(context: vscode.ExtensionContext): void {
   void buildMenu();
 
+  const secrets = new SecretStore(context.secrets);
+
   context.subscriptions.push(
     { dispose: () => disposeMenu() },
     vscode.workspace.onDidChangeConfiguration((e) => {
@@ -61,6 +67,10 @@ export function activate(context: vscode.ExtensionContext): void {
         ChatPanel.show(context, { ...host, me: human.handle });
       }),
     ),
+    vscode.commands.registerCommand('automatos.openAutoChat', () =>
+      withHost((host) => openAutoChatFlow(context, host, secrets)),
+    ),
+    vscode.commands.registerCommand('automatos.setAutomatosKey', () => setAutomatosKey(secrets)),
     vscode.commands.registerCommand('automatos.consolidateMemory', () =>
       withHost((host) => consolidateMemory(host.store, host.git)),
     ),
@@ -177,6 +187,38 @@ async function launchFlow(host: Host, arg: unknown): Promise<void> {
     { root: host.root, store: host.store, git: host.git, me: human.handle, config, probe: nodeEngineProbe() },
     card,
   );
+}
+
+/**
+ * Open the AUTO chat panel, building the widget-plane client from `config.yml` (baseUrl/agentId)
+ * and the per-user publishable key in the keychain. With no key yet, offer to set one rather
+ * than failing — chat is the slice that does not need the board-auth unlock.
+ */
+async function openAutoChatFlow(
+  context: vscode.ExtensionContext,
+  host: Host,
+  secrets: SecretStore,
+): Promise<void> {
+  const apiKey = await secrets.get(WORKSPACE_KEY_NAME);
+  if (!apiKey) {
+    const setKey = 'Set Key';
+    const choice = await vscode.window.showWarningMessage(
+      'Add your Automatos workspace key (ak_pub_…) to chat with AUTO.',
+      setKey,
+    );
+    if (choice === setKey) {
+      await setAutomatosKey(secrets);
+    }
+    return;
+  }
+  const config = await loadConfig(host.store);
+  const human = await currentHuman();
+  const client = createAutoClient({
+    baseUrl: config.automatos.baseUrl,
+    apiKey,
+    agentId: config.automatos.agentId,
+  });
+  AutoChatPanel.show(context, { client, me: human?.handle ?? 'you' });
 }
 
 /** Pick a ready PRD and have AUTO split its `## Tasks` checklist into child cards. */

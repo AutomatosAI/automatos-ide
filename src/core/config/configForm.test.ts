@@ -195,6 +195,24 @@ describe('validateDraft', () => {
     expect(result.config?.secrets.sopsRecipients).toEqual(['age1abc', 'age1def']);
   });
 
+  it('preserves the previous automatos block, which the form does not manage', () => {
+    const previous = {
+      ...DEFAULT_CONFIG,
+      automatos: { baseUrl: 'https://auto.example.com', agentId: 'agent-9' },
+    };
+    const result = validateDraft(configToDraft(previous), previous);
+    expect(result.ok).toBe(true);
+    expect(result.config?.automatos).toEqual({
+      baseUrl: 'https://auto.example.com',
+      agentId: 'agent-9',
+    });
+  });
+
+  it('defaults the automatos block when no previous config is supplied', () => {
+    const result = validateDraft(configToDraft(DEFAULT_CONFIG));
+    expect(result.config?.automatos).toEqual(DEFAULT_CONFIG.automatos);
+  });
+
   it('collects every field error in a single pass', () => {
     const draft = {
       ...configToDraft(DEFAULT_CONFIG),
@@ -222,6 +240,16 @@ describe('serializeConfig', () => {
       secrets: { sopsRecipients: ['age1abc'] },
     };
     const yaml = serializeConfig(cfg);
+    expect(parseConfig(yaml)).toEqual(cfg);
+  });
+
+  it('round-trips a custom automatos block through parseConfig', () => {
+    const cfg = {
+      ...DEFAULT_CONFIG,
+      automatos: { baseUrl: 'https://auto.example.com', agentId: 'agent-9' },
+    };
+    const yaml = serializeConfig(cfg);
+    expect(yaml).toMatch(/base_url: https:\/\/auto\.example\.com/);
     expect(parseConfig(yaml)).toEqual(cfg);
   });
 

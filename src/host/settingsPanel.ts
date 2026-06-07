@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { FileStore } from '../fs/fileStore';
 import { CONFIG_FILENAME } from './workspace';
-import { parseConfig } from '../core/config/config';
+import { Config, DEFAULT_CONFIG, parseConfig } from '../core/config/config';
 import {
   configToDraft,
   ConfigFormDraft,
@@ -76,6 +76,15 @@ export class SettingsPanel {
     }
   }
 
+  /** The current on-disk config, or kernel defaults when it is absent or malformed. */
+  private async loadConfig(): Promise<Config> {
+    try {
+      return parseConfig(await this.deps.store.read(CONFIG_FILENAME));
+    } catch {
+      return DEFAULT_CONFIG;
+    }
+  }
+
   private async onMessage(msg: unknown): Promise<void> {
     if (isSaveMessage(msg)) {
       await this.save(msg.draft);
@@ -88,7 +97,9 @@ export class SettingsPanel {
 
   private async save(rawDraft: unknown): Promise<void> {
     const draft = normalizeDraft(rawDraft);
-    const result = validateDraft(draft);
+    // Pass the on-disk config as the baseline so sections the form does not surface
+    // (e.g. the automatos block) survive the round-trip instead of resetting to defaults.
+    const result = validateDraft(draft, await this.loadConfig());
     if (!result.ok) {
       this.render(draft, result.errors, false);
       return;

@@ -82,3 +82,28 @@ secrets:
     expect(() => parseConfig('sync:\n  pull_interval_seconds: 0\n')).toThrow(/greater than 0/);
   });
 });
+
+describe('parseConfig automatos', () => {
+  it('defaults to the public api base url and a null agent id', () => {
+    const cfg = parseConfig('');
+    expect(cfg.automatos).toEqual({ baseUrl: 'https://api.automatos.app', agentId: null });
+  });
+
+  it('reads base_url and agent_id', () => {
+    const cfg = parseConfig(`automatos:
+  base_url: https://auto.example.com
+  agent_id: agent-123
+`);
+    expect(cfg.automatos).toEqual({ baseUrl: 'https://auto.example.com', agentId: 'agent-123' });
+  });
+
+  it('trims a trailing slash from base_url', () => {
+    const cfg = parseConfig('automatos:\n  base_url: https://auto.example.com/\n');
+    expect(cfg.automatos.baseUrl).toBe('https://auto.example.com');
+  });
+
+  it('falls back to the default base url when base_url is blank', () => {
+    const cfg = parseConfig('automatos:\n  base_url: "   "\n');
+    expect(cfg.automatos.baseUrl).toBe('https://api.automatos.app');
+  });
+});

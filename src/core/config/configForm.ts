@@ -61,7 +61,17 @@ export function configToDraft(config: Config): ConfigFormDraft {
   };
 }
 
-export function validateDraft(draft: ConfigFormDraft): ValidationResult {
+/**
+ * Validate a form draft against the kernel rules, folding it into the next {@link Config}.
+ *
+ * `previous` carries forward sections the M0 form does not surface (currently {@link Config.automatos})
+ * so saving the settings panel never silently drops a hand-edited `automatos` block. Defaults to
+ * {@link DEFAULT_CONFIG} for callers (and tests) that have no prior config on disk.
+ */
+export function validateDraft(
+  draft: ConfigFormDraft,
+  previous: Config = DEFAULT_CONFIG,
+): ValidationResult {
   const errors: Record<string, string> = {};
 
   const maxWorkers = parsePositiveInt(draft.maxWorkers);
@@ -125,6 +135,7 @@ export function validateDraft(draft: ConfigFormDraft): ValidationResult {
       consolidateCron: DEFAULT_CONFIG.memory.consolidateCron,
     },
     secrets: { sopsRecipients },
+    automatos: previous.automatos,
   };
 
   return { ok: true, errors: {}, config };
@@ -151,8 +162,16 @@ export function serializeConfig(config: Config): string {
     secrets: {
       sops_recipients: [...config.secrets.sopsRecipients],
     },
+    automatos: automatosYaml(config),
   };
   return YAML.stringify(root);
+}
+
+/** The automatos block — emits `agent_id` only when set, mirroring the omit-defaults style. */
+function automatosYaml(config: Config): { base_url: string; agent_id?: string } {
+  return config.automatos.agentId === null
+    ? { base_url: config.automatos.baseUrl }
+    : { base_url: config.automatos.baseUrl, agent_id: config.automatos.agentId };
 }
 
 function parsePositiveInt(raw: string): number | null {
